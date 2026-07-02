@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Livewire\Admin;
+
+use App\Models\AuditEvent;
+use App\Models\Setting;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
+use Livewire\Component;
+
+#[Layout('admin.layout')]
+#[Title('Einstellungen')]
+class Settings extends Component
+{
+    public string $subject_tag = '';
+
+    public bool $smime_auto = true;
+
+    public bool $smime_sign = true;
+
+    public int $retention_days = 30;
+
+    public function mount(): void
+    {
+        $this->subject_tag = (string) Setting::get('subject_tag', config('mailgateway.subject_tag'));
+        $this->smime_auto = Setting::getBool('smime_auto', true);
+        $this->smime_sign = Setting::getBool('smime_sign', true);
+        $this->retention_days = (int) Setting::get('retention_days', config('mailgateway.retention_days'));
+    }
+
+    public function save(): void
+    {
+        $this->validate([
+            'subject_tag' => 'required|string|min:2|max:50',
+            'retention_days' => 'required|integer|min:1|max:365',
+        ], [
+            'subject_tag.required' => 'Das Tag darf nicht leer sein — sonst gäbe es keinen Portal-Auslöser mehr.',
+            'subject_tag.min' => 'Das Tag sollte mindestens 2 Zeichen haben, um Fehlauslösungen zu vermeiden.',
+            'retention_days.min' => 'Mindestens 1 Tag.',
+            'retention_days.max' => 'Höchstens 365 Tage.',
+        ]);
+
+        Setting::set('subject_tag', trim($this->subject_tag));
+        Setting::set('smime_auto', $this->smime_auto);
+        Setting::set('smime_sign', $this->smime_sign);
+        Setting::set('retention_days', $this->retention_days);
+
+        AuditEvent::log('settings_changed', ip: request()->ip(), details: [
+            'subject_tag' => trim($this->subject_tag),
+            'smime_auto' => $this->smime_auto,
+            'smime_sign' => $this->smime_sign,
+            'retention_days' => $this->retention_days,
+        ]);
+
+        session()->flash('ok', 'Einstellungen gespeichert. Sie gelten sofort für alle neu eingehenden Mails.');
+    }
+
+    public function render()
+    {
+        return view('livewire.admin.settings');
+    }
+}
