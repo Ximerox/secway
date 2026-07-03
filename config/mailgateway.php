@@ -2,6 +2,10 @@
 
 return [
 
+    // Betreibername, wie ihn Empfänger sehen (Portal-Kopf, Mail-Absenderzeile).
+    // Überschreibbar in den Admin-Einstellungen (operator_name).
+    'operator_name' => env('MGW_OPERATOR_NAME', 'SecWay'),
+
     // Aufbewahrung in Tagen, danach löscht mail:purge Nachricht + Anhänge
     'retention_days' => env('MGW_RETENTION_DAYS', 30),
 
@@ -21,7 +25,7 @@ return [
 
     // Eigene (interne) Domains, kommagetrennt — Empfänger dieser Domains
     // gelten als eingehende Mail (Entschlüsselung/Signaturprüfung/Ernten)
-    'internal_domains' => env('MGW_INTERNAL_DOMAINS', 'straphael.de'),
+    'internal_domains' => env('MGW_INTERNAL_DOMAINS', ''),
 
     // Geheimnis, das die EXO-Transportregel als Header setzen muss.
     // Ohne gültigen Header wird eingehende Post abgewiesen (Bounce an Absender).

@@ -37,6 +37,12 @@ class Setting extends Model
         return $value === null ? $default : (bool) (int) $value;
     }
 
+    /** Name des Betreibers, wie ihn Empfänger zu sehen bekommen (Portal, Mails). */
+    public static function operator(): string
+    {
+        return (string) self::get('operator_name', config('mailgateway.operator_name'));
+    }
+
     public static function set(string $key, mixed $value): void
     {
         $value = is_bool($value) ? (string) (int) $value : (string) $value;

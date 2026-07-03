@@ -65,6 +65,24 @@
             </div>
         </div>
 
+        <div class="card">
+            <h2 style="margin-top:0;">Betreiber &amp; Rechtliches</h2>
+
+            <label>Name des Betreibers</label>
+            <input type="text" wire:model="operator_name" style="max-width:320px;">
+            @error('operator_name')<div class="error">{{ $message }}</div>@enderror
+            <p class="muted" style="margin-top:6px;">Erscheint für Empfänger im Portal-Kopf, im Seitentitel und in den Benachrichtigungs-Mails („… · Sichere Nachricht").</p>
+
+            <label style="margin-top:16px;">Impressum (HTML)</label>
+            <textarea wire:model="legal_impressum" rows="10" style="width:100%;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;"></textarea>
+            @error('legal_impressum')<div class="error">{{ $message }}</div>@enderror
+
+            <label style="margin-top:16px;">Datenschutzerklärung (HTML)</label>
+            <textarea wire:model="legal_datenschutz" rows="14" style="width:100%;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;"></textarea>
+            @error('legal_datenschutz')<div class="error">{{ $message }}</div>@enderror
+            <p class="muted" style="margin-top:6px;">Beide Texte werden unverändert auf <a href="{{ url('/impressum') }}" target="_blank">/impressum</a> bzw. <a href="{{ url('/datenschutz') }}" target="_blank">/datenschutz</a> ausgegeben. Erlaubt sind einfache HTML-Elemente wie &lt;h2&gt;, &lt;p&gt;, &lt;a&gt;, &lt;br&gt;, &lt;strong&gt;.</p>
+        </div>
+
         <button type="submit" class="btn" wire:loading.attr="disabled">Speichern</button>
     </form>
 </div>

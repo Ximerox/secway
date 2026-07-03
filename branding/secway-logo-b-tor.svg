@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>SecWay – Tor &amp; Weg</title>
+  <path d="M12 58 V26 C12 13 23 7 32 7 C41 7 52 13 52 26 V58" stroke="#1d4e89" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <rect x="7" y="36" width="19" height="14" rx="2" fill="#059669"/>
+  <path d="M8.5 38 L16.5 43.5 L24.5 38" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M30 43 H48 M42 36 L50 43 L42 50" stroke="#059669" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

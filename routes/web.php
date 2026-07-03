@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('portal.error', [
         'title' => 'Sichere Nachrichtenübermittlung',
-        'text' => 'Über dieses Portal stellt St. Raphael vertrauliche Nachrichten zu. Den Zugriffslink und das zugehörige Kennwort erhalten Empfänger per E-Mail.',
+        'text' => 'Über dieses Portal stellt '.\App\Models\Setting::operator().' vertrauliche Nachrichten zu. Den Zugriffslink und das zugehörige Kennwort erhalten Empfänger per E-Mail.',
     ]);
 });
 

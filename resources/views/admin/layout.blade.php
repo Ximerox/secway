@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>{{ $title ?? 'Verwaltung' }} · Mailgateway · St. Raphael</title>
+<title>{{ $title ?? 'Verwaltung' }} · SecWay · {{ \App\Models\Setting::operator() }}</title>
+<link rel="icon" type="image/svg+xml" href="{{ url('/favicon.svg') }}">
 <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: #eef2f6; color: #1f2937; min-height: 100vh; }
@@ -52,7 +53,14 @@
 </head>
 <body>
 <nav>
-    <span class="brand">St. Raphael · Mailgateway</span>
+    <span class="brand" style="display:flex;align-items:center;gap:9px;">
+        <svg viewBox="0 0 64 64" width="26" height="26" aria-hidden="true">
+            <path d="M32 4 L56 12 V30 C56 46 45 55 32 60 C19 55 8 46 8 30 V12 Z" fill="#ffffff"/>
+            <rect x="18" y="24" width="28" height="19" rx="2.5" fill="#1d4e89"/>
+            <path d="M19.5 26.5 L32 35.5 L44.5 26.5" stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        SecWay
+    </span>
     <a href="{{ route('admin.stats') }}" @class(['active' => request()->routeIs('admin.stats')])>Statistik</a>
     <a href="{{ route('admin.messages') }}" @class(['active' => request()->routeIs('admin.messages')])>Nachrichten</a>
     <a href="{{ route('admin.queue') }}" @class(['active' => request()->routeIs('admin.queue')])>Warteschlange</a>

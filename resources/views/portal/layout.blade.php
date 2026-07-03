@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>@yield('title') · Sichere Nachricht · St. Raphael</title>
+<title>@yield('title') · Sichere Nachricht · {{ \App\Models\Setting::operator() }}</title>
+<link rel="icon" type="image/svg+xml" href="{{ url('/favicon.svg') }}">
 <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -14,10 +15,7 @@
     }
     .wrap { width: 100%; max-width: 1200px; padding: 24px 16px 48px; }
     header { padding: 8px 4px 20px; display: flex; align-items: center; gap: 10px; }
-    .brand-badge {
-        width: 36px; height: 36px; border-radius: 9px; background: #1d4e89; color: #fff;
-        display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;
-    }
+    .brand-badge { width: 38px; height: 38px; display: flex; align-items: center; }
     .brand { font-weight: 600; color: #1d4e89; font-size: 17px; }
     .brand small { display: block; font-weight: 400; color: #6b7280; font-size: 12.5px; }
     .card {
@@ -63,14 +61,20 @@
 <body>
 <div class="wrap">
     <header>
-        <div class="brand-badge">R</div>
-        <div class="brand">St. Raphael<small>Sichere Nachrichtenübermittlung</small></div>
+        <div class="brand-badge">
+            <svg viewBox="0 0 64 64" width="38" height="38" role="img" aria-label="Logo">
+                <path d="M32 4 L56 12 V30 C56 46 45 55 32 60 C19 55 8 46 8 30 V12 Z" fill="#1d4e89"/>
+                <rect x="18" y="24" width="28" height="19" rx="2.5" fill="#ffffff"/>
+                <path d="M19.5 26.5 L32 35.5 L44.5 26.5" stroke="#1d4e89" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="brand">{{ \App\Models\Setting::operator() }}<small>Sichere Nachrichtenübermittlung</small></div>
     </header>
     <main class="card">
         @yield('content')
     </main>
     <footer>
-        Vertrauliche Zustellung über mailgateway.straphael.de · Verschlüsselt gespeichert, automatische Löschung nach Ablauf<br>
+        Vertrauliche Zustellung über {{ request()->getHost() }} · Verschlüsselt gespeichert, automatische Löschung nach Ablauf<br>
         <a href="{{ url('/impressum') }}" style="color:#6b7280;">Impressum</a> ·
         <a href="{{ url('/datenschutz') }}" style="color:#6b7280;">Datenschutzerklärung</a>
     </footer>

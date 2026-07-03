@@ -26,6 +26,12 @@ class Settings extends Component
 
     public string $internal_domains = '';
 
+    public string $operator_name = '';
+
+    public string $legal_impressum = '';
+
+    public string $legal_datenschutz = '';
+
     public function mount(): void
     {
         $this->subject_tag = (string) Setting::get('subject_tag', config('mailgateway.subject_tag'));
@@ -35,6 +41,9 @@ class Settings extends Component
         $this->password_delay_minutes = (int) Setting::get('password_delay_minutes', config('mailgateway.password_delay_minutes'));
         $this->reminder_after_hours = (int) Setting::get('reminder_after_hours', config('mailgateway.reminder_after_hours'));
         $this->internal_domains = (string) Setting::get('internal_domains', config('mailgateway.internal_domains'));
+        $this->operator_name = Setting::operator();
+        $this->legal_impressum = (string) Setting::get('legal_impressum', '');
+        $this->legal_datenschutz = (string) Setting::get('legal_datenschutz', '');
     }
 
     public function save(): void
@@ -45,6 +54,9 @@ class Settings extends Component
             'password_delay_minutes' => 'required|integer|min:0|max:60',
             'reminder_after_hours' => 'required|integer|min:0|max:2160',
             'internal_domains' => ['required', 'regex:/^[a-z0-9.-]+(\s*,\s*[a-z0-9.-]+)*$/i'],
+            'operator_name' => 'required|string|min:2|max:100',
+            'legal_impressum' => 'nullable|string|max:60000',
+            'legal_datenschutz' => 'nullable|string|max:60000',
         ], [
             'internal_domains.required' => 'Mindestens eine interne Domain wird benötigt (z.B. straphael.de).',
             'internal_domains.regex' => 'Bitte Domains kommagetrennt angeben, z.B.: straphael.de, zweite-domain.de',
@@ -61,6 +73,9 @@ class Settings extends Component
         Setting::set('password_delay_minutes', $this->password_delay_minutes);
         Setting::set('reminder_after_hours', $this->reminder_after_hours);
         Setting::set('internal_domains', strtolower(trim($this->internal_domains)));
+        Setting::set('operator_name', trim($this->operator_name));
+        Setting::set('legal_impressum', trim($this->legal_impressum));
+        Setting::set('legal_datenschutz', trim($this->legal_datenschutz));
 
         AuditEvent::log('settings_changed', ip: request()->ip(), details: [
             'subject_tag' => trim($this->subject_tag),
@@ -70,6 +85,7 @@ class Settings extends Component
             'password_delay_minutes' => $this->password_delay_minutes,
             'reminder_after_hours' => $this->reminder_after_hours,
             'internal_domains' => strtolower(trim($this->internal_domains)),
+            'operator_name' => trim($this->operator_name),
         ]);
 
         session()->flash('ok', 'Einstellungen gespeichert. Sie gelten sofort für alle neu eingehenden Mails.');

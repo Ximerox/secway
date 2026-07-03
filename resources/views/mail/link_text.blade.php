@@ -1,6 +1,6 @@
 Guten Tag,
 
-{{ $senderName }} ({{ $senderEmail }}) hat Ihnen eine vertrauliche Nachricht über die sichere Nachrichtenübermittlung von St. Raphael gesendet.
+{{ $senderName }} ({{ $senderEmail }}) hat Ihnen eine vertrauliche Nachricht über die sichere Nachrichtenübermittlung von {{ AppModelsSetting::operator() }} gesendet.
 
 Nachricht abrufen:
 {{ $url }}
