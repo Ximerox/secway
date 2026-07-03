@@ -139,6 +139,7 @@ class MailIngest extends Command
             app(SmimeMailService::class)->passThrough($raw, $sender, $passRcpts);
             AuditEvent::log('passed_through', details: [
                 'queue_id' => $queueId, 'sender' => $sender, 'recipients' => $passRcpts,
+                'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
             ]);
         }
 
@@ -150,6 +151,7 @@ class MailIngest extends Command
                     'sender' => $sender,
                     'recipients' => array_keys($smime),
                     'signed' => SmimeCertificate::ownForAddress($sender) !== null,
+                    'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
                 ]);
             } catch (Throwable $e) {
                 // Fallback: bei S/MIME-Problemen niemals unverschlüsselt senden, sondern Portal
