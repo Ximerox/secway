@@ -50,6 +50,12 @@
                     @error('retention_days')<div class="error">{{ $message }}</div>@enderror
                     <p class="muted" style="margin-top:6px;">Danach werden Nachricht und Anhänge automatisch und unwiederbringlich gelöscht. Gilt für neue Nachrichten ab dem Zeitpunkt der Änderung.</p>
                 </div>
+                <div>
+                    <label>Zeitversatz Kennwort-Mail (Minuten)</label>
+                    <input type="text" wire:model="password_delay_minutes" style="max-width:120px;">
+                    @error('password_delay_minutes')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">Die Kennwort-Mail wird um diese Zeitspanne nach der Link-Mail versendet (0 = beide gleichzeitig). Der Versand erfolgt minutengenau über den Scheduler.</p>
+                </div>
             </div>
         </div>
 

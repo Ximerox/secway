@@ -255,21 +255,29 @@ class MailIngest extends Command
         }
 
         $password = $this->generatePassword();
+        $delay = (int) Setting::get('password_delay_minutes', config('mailgateway.password_delay_minutes'));
+
         $recipient = MessageRecipient::create([
             'secure_message_id' => $msg->id,
             'email' => $email,
             'token' => bin2hex(random_bytes(32)),
             'password_hash' => Hash::make($password),
+            'pending_password' => $delay > 0 ? Crypt::encryptString($password) : null,
+            'password_due_at' => now()->addMinutes(max(0, $delay)),
         ]);
 
         Mail::to($email)->send(new SecureLinkMail($msg, $recipient));
         $recipient->notified_at = now();
 
-        Mail::to($email)->send(new PasswordMail($msg, $password));
-        $recipient->password_sent_at = now();
+        // Kennwort sofort oder zeitversetzt (dann übernimmt mail:send-passwords)
+        if ($delay <= 0) {
+            Mail::to($email)->send(new PasswordMail($msg, $password));
+            $recipient->password_sent_at = now();
+            $recipient->pending_password = null;
+        }
         $recipient->save();
 
-        AuditEvent::log('recipient_notified', $msg, $recipient);
+        AuditEvent::log('recipient_notified', $msg, $recipient, details: ['password_delay_min' => max(0, $delay)]);
     }
 
     private function cleanSubject(string $subject): string

@@ -9,6 +9,10 @@ return [
     'max_attempts' => env('MGW_MAX_ATTEMPTS', 5),
     'lockout_minutes' => env('MGW_LOCKOUT_MINUTES', 15),
 
+    // Zeitlicher Versatz (Minuten) zwischen Link-Mail und Kennwort-Mail.
+    // 0 = beide sofort. Der Versand übernimmt der Scheduler (mail:send-passwords).
+    'password_delay_minutes' => env('MGW_PASSWORD_DELAY_MINUTES', 2),
+
     // Auslöse-Tag im Betreff, wird vor der Ablage entfernt
     'subject_tag' => env('MGW_SUBJECT_TAG', '[sicher]'),
 

@@ -9,7 +9,7 @@ class MessageRecipient extends Model
 {
     protected $guarded = [];
 
-    protected $hidden = ['password_hash'];
+    protected $hidden = ['password_hash', 'pending_password'];
 
     protected function casts(): array
     {
@@ -17,6 +17,7 @@ class MessageRecipient extends Model
             'locked_until' => 'datetime',
             'notified_at' => 'datetime',
             'password_sent_at' => 'datetime',
+            'password_due_at' => 'datetime',
             'first_viewed_at' => 'datetime',
             'last_viewed_at' => 'datetime',
         ];
