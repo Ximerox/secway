@@ -120,6 +120,7 @@
             <strong>Bestand</strong>
             <table class="plain">
                 <tr><td>Nachrichten im Portal</td><td class="mono" style="text-align:right;">{{ number_format($storeCount, 0, ',', '.') }}</td></tr>
+                <tr><td>Empfänger, die noch nicht abgerufen haben</td><td class="mono" style="text-align:right;"><a href="{{ route('admin.messages') }}">{{ number_format($unviewedNow, 0, ',', '.') }}</a></td></tr>
                 <tr><td>Belegter Speicher</td><td class="mono" style="text-align:right;">{{ number_format($storeBytes / 1048576, 1, ',', '.') }} MB</td></tr>
                 <tr><td>Partner-Zertifikate aktiv</td><td class="mono" style="text-align:right;">{{ number_format($certsPartner, 0, ',', '.') }}</td></tr>
                 <tr><td>davon automatisch geerntet</td><td class="mono" style="text-align:right;">{{ number_format($certsHarvested, 0, ',', '.') }}</td></tr>

@@ -3,7 +3,6 @@
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\PortalController;
 use App\Livewire\Admin\Certificates;
-use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\Log;
 use App\Livewire\Admin\Messages;
 use App\Livewire\Admin\Queue as AdminQueue;
@@ -28,7 +27,9 @@ Route::prefix('admin')->group(function () {
     Route::post('logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
     Route::middleware('auth')->group(function () {
-        Route::get('/', Dashboard::class)->name('admin.dashboard');
+        // Übersicht ist in Statistik + Protokoll aufgegangen; Routenname bleibt
+        // erhalten, damit bestehende Redirects (Login) weiter funktionieren.
+        Route::get('/', fn () => redirect()->route('admin.stats'))->name('admin.dashboard');
         Route::get('/nachrichten', Messages::class)->name('admin.messages');
         Route::get('/warteschlange', AdminQueue::class)->name('admin.queue');
         Route::get('/protokoll', Log::class)->name('admin.log');

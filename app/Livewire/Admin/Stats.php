@@ -104,6 +104,7 @@ class Stats extends Component
             'topSenders' => array_slice($topSenders, 0, 8, true),
             'storeCount' => SecureMessage::count(),
             'storeBytes' => (int) SecureMessage::sum('size_bytes'),
+            'unviewedNow' => MessageRecipient::whereNull('first_viewed_at')->count(),
             'certsPartner' => SmimeCertificate::where('type', 'partner')->where('active', true)->count(),
             'certsHarvested' => SmimeCertificate::where('source', 'harvested')->where('active', true)->count(),
             'expiring' => SmimeCertificate::where('active', true)
