@@ -51,7 +51,7 @@ class SmimeInboundService
                 $decrypted = true;
             } else {
                 // Kein passender Schlüssel: unverändert zustellen statt Mail zu verlieren
-                $status[] = 'decrypt_failed';
+                $status[] = 'decrypt_failed'.$this->describeRecipientInfos($currentFile);
             }
         }
 
@@ -102,6 +102,35 @@ class SmimeInboundService
         }
 
         return false;
+    }
+
+    /**
+     * Diagnose bei fehlgeschlagener Entschlüsselung: an welche Zertifikate
+     * (Aussteller/Seriennummer) war die Mail verschlüsselt?
+     */
+    private function describeRecipientInfos(string $file): string
+    {
+        $out = (string) shell_exec('openssl cms -in '.escapeshellarg($file).' -cmsout -print -noout 2>/dev/null');
+        if ($out === '') {
+            return '';
+        }
+        $targets = [];
+        if (preg_match_all('/issuer:\s*(.+?)\n\s*serialNumber:\s*(\S+)/s', $out, $m, PREG_SET_ORDER)) {
+            foreach ($m as $hit) {
+                $serial = $hit[2];
+                if (str_starts_with($serial, '0x')) {
+                    $serial = strtoupper(substr($serial, 2));
+                } elseif (ctype_digit($serial) && $serial <= (string) PHP_INT_MAX) {
+                    $serial = strtoupper(dechex((int) $serial));
+                }
+                $targets[] = trim($hit[1]).' / Serial '.$serial;
+            }
+        }
+        if ($targets === []) {
+            return '';
+        }
+
+        return ' (verschlüsselt an: '.implode(' | ', array_unique($targets)).')';
     }
 
     private function verifyAndHarvest(string $file, string $sender, string $tmpDir): string
