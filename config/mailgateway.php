@@ -12,6 +12,10 @@ return [
     // Auslöse-Tag im Betreff, wird vor der Ablage entfernt
     'subject_tag' => env('MGW_SUBJECT_TAG', '[sicher]'),
 
+    // Eigene (interne) Domains, kommagetrennt — Empfänger dieser Domains
+    // gelten als eingehende Mail (Entschlüsselung/Signaturprüfung/Ernten)
+    'internal_domains' => env('MGW_INTERNAL_DOMAINS', 'straphael.de'),
+
     // Geheimnis, das die EXO-Transportregel als Header setzen muss.
     // Ohne gültigen Header wird eingehende Post abgewiesen (Bounce an Absender).
     'secret_header' => 'X-MGW-Auth',

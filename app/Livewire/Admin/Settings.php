@@ -20,12 +20,15 @@ class Settings extends Component
 
     public int $retention_days = 30;
 
+    public string $internal_domains = '';
+
     public function mount(): void
     {
         $this->subject_tag = (string) Setting::get('subject_tag', config('mailgateway.subject_tag'));
         $this->smime_auto = Setting::getBool('smime_auto', true);
         $this->smime_sign = Setting::getBool('smime_sign', true);
         $this->retention_days = (int) Setting::get('retention_days', config('mailgateway.retention_days'));
+        $this->internal_domains = (string) Setting::get('internal_domains', config('mailgateway.internal_domains'));
     }
 
     public function save(): void
@@ -33,7 +36,10 @@ class Settings extends Component
         $this->validate([
             'subject_tag' => 'required|string|min:2|max:50',
             'retention_days' => 'required|integer|min:1|max:365',
+            'internal_domains' => ['required', 'regex:/^[a-z0-9.-]+(\s*,\s*[a-z0-9.-]+)*$/i'],
         ], [
+            'internal_domains.required' => 'Mindestens eine interne Domain wird benötigt (z.B. straphael.de).',
+            'internal_domains.regex' => 'Bitte Domains kommagetrennt angeben, z.B.: straphael.de, zweite-domain.de',
             'subject_tag.required' => 'Das Tag darf nicht leer sein — sonst gäbe es keinen Portal-Auslöser mehr.',
             'subject_tag.min' => 'Das Tag sollte mindestens 2 Zeichen haben, um Fehlauslösungen zu vermeiden.',
             'retention_days.min' => 'Mindestens 1 Tag.',
@@ -44,12 +50,14 @@ class Settings extends Component
         Setting::set('smime_auto', $this->smime_auto);
         Setting::set('smime_sign', $this->smime_sign);
         Setting::set('retention_days', $this->retention_days);
+        Setting::set('internal_domains', strtolower(trim($this->internal_domains)));
 
         AuditEvent::log('settings_changed', ip: request()->ip(), details: [
             'subject_tag' => trim($this->subject_tag),
             'smime_auto' => $this->smime_auto,
             'smime_sign' => $this->smime_sign,
             'retention_days' => $this->retention_days,
+            'internal_domains' => strtolower(trim($this->internal_domains)),
         ]);
 
         session()->flash('ok', 'Einstellungen gespeichert. Sie gelten sofort für alle neu eingehenden Mails.');

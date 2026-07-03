@@ -10,8 +10,10 @@ use App\Models\MessageRecipient;
 use App\Models\SecureMessage;
 use App\Models\Setting;
 use App\Models\SmimeCertificate;
+use App\Services\SmimeInboundService;
 use App\Services\SmimeMailService;
 use App\Support\Crypto;
+use App\Support\InternalDomains;
 use App\Support\SubjectTag;
 use Illuminate\Console\Command;
 use Illuminate\Database\QueryException;
@@ -95,12 +97,19 @@ class MailIngest extends Command
         $hasTag = SubjectTag::contains((string) $parsed->getSubject());
         $autoEncrypt = Setting::getBool('smime_auto', true);
 
+        $inboundRcpts = [];
         $smime = [];
         $portalRcpts = [];
         $passRcpts = [];
         foreach ($recipients as $rcpt) {
             if (! filter_var($rcpt, FILTER_VALIDATE_EMAIL)) {
                 Log::warning("mail:ingest {$queueId}: ungültige Empfängeradresse übersprungen: {$rcpt}");
+
+                continue;
+            }
+            // Empfänger in interner Domain = eingehende Mail (entschlüsseln/prüfen/ernten)
+            if (InternalDomains::isInternal($rcpt)) {
+                $inboundRcpts[] = $rcpt;
 
                 continue;
             }
@@ -112,6 +121,16 @@ class MailIngest extends Command
             } else {
                 $passRcpts[] = $rcpt;
             }
+        }
+
+        if ($inboundRcpts !== []) {
+            $status = app(SmimeInboundService::class)->process($raw, $sender, $inboundRcpts);
+            AuditEvent::log('inbound_processed', details: [
+                'queue_id' => $queueId,
+                'sender' => $sender,
+                'recipients' => $inboundRcpts,
+                'status' => $status,
+            ]);
         }
 
         if ($passRcpts !== []) {

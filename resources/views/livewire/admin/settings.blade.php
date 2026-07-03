@@ -27,6 +27,14 @@
         </div>
 
         <div class="card">
+            <h2 style="margin-top:0;">Mailfluss</h2>
+            <label>Interne Domains (kommagetrennt)</label>
+            <input type="text" wire:model="internal_domains" placeholder="straphael.de">
+            @error('internal_domains')<div class="error">{{ $message }}</div>@enderror
+            <p class="muted" style="margin-top:6px;">Mails an Empfänger dieser Domains gelten als <strong>eingehend</strong>: Das Gateway entschlüsselt S/MIME mit den eigenen Zertifikaten, prüft Signaturen und erntet Absender-Zertifikate. Alle anderen Empfänger gelten als ausgehend.</p>
+        </div>
+
+        <div class="card">
             <h2 style="margin-top:0;">Portal</h2>
 
             <div class="grid2">

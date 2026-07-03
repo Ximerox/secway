@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Setting;
 use App\Models\SmimeCertificate;
+use App\Support\RawMail;
 use App\Support\SubjectTag;
 use RuntimeException;
 use ZBateson\MailMimeParser\Message;
@@ -39,7 +40,7 @@ class SmimeMailService
 
     private function process(string $raw, string $sender, array $recipients, Message $parsed, string $tmpDir): void
     {
-        [$headerBlock, $body] = $this->splitRawMessage($raw);
+        [$headerBlock, $body] = RawMail::split($raw);
 
         // 1) Innere MIME-Entität: nur Content-Header + Body
         file_put_contents($tmpDir.'/inner.eml', $this->buildInnerEntity($headerBlock, $body));
@@ -93,7 +94,7 @@ class SmimeMailService
         $final = $this->composeFinal($headerBlock, file_get_contents($encrypted), $parsed);
 
         // 5) Zurück an Postfix (pickup — läuft nicht durch den Content-Filter)
-        $this->submit($final, $sender, array_keys($recipients));
+        RawMail::submit($final, $sender, array_keys($recipients));
     }
 
     /**
@@ -102,55 +103,21 @@ class SmimeMailService
      */
     public function passThrough(string $raw, string $sender, array $recipients): void
     {
-        [$headerBlock, $body] = $this->splitRawMessage($raw);
+        [$headerBlock, $body] = RawMail::split($raw);
         $drop = [
             strtolower((string) config('mailgateway.secret_header')),
             'x-mgw-notification',
             'bcc',
         ];
         $keep = [];
-        foreach ($this->headerLines($headerBlock) as $line) {
-            if (! in_array($this->headerName($line), $drop, true)) {
+        foreach (RawMail::headerLines($headerBlock) as $line) {
+            if (! in_array(RawMail::headerName($line), $drop, true)) {
                 $keep[] = $line;
             }
         }
         $keep[] = 'X-MGW-Notification: yes';
 
-        $this->submit(implode("\n", $keep)."\n\n".$body, $sender, $recipients);
-    }
-
-    /** @return array{0: string, 1: string} [Header-Block, Body] */
-    private function splitRawMessage(string $raw): array
-    {
-        if (! preg_match('/\r?\n\r?\n/', $raw, $m, PREG_OFFSET_CAPTURE)) {
-            return [$raw, ''];
-        }
-        $pos = $m[0][1];
-
-        return [substr($raw, 0, $pos), substr($raw, $pos + strlen($m[0][0]))];
-    }
-
-    /** Zerlegt einen Header-Block in logische (entfaltete) Header-Zeilen. */
-    private function headerLines(string $headerBlock): array
-    {
-        $out = [];
-        foreach (preg_split('/\r?\n/', rtrim($headerBlock)) as $line) {
-            if ($line === '') {
-                continue;
-            }
-            if (($line[0] === ' ' || $line[0] === "\t") && $out !== []) {
-                $out[count($out) - 1] .= "\n".$line;
-            } else {
-                $out[] = $line;
-            }
-        }
-
-        return $out;
-    }
-
-    private function headerName(string $logicalLine): string
-    {
-        return strtolower(trim(strtok($logicalLine, ':')));
+        RawMail::submit(implode("\n", $keep)."\n\n".$body, $sender, $recipients);
     }
 
     /** Innere Entität: Content-Header der Originalmail + Body. */
@@ -158,8 +125,8 @@ class SmimeMailService
     {
         $keep = [];
         $hasContentType = false;
-        foreach ($this->headerLines($headerBlock) as $line) {
-            $name = $this->headerName($line);
+        foreach (RawMail::headerLines($headerBlock) as $line) {
+            $name = RawMail::headerName($line);
             if (in_array($name, ['content-type', 'content-transfer-encoding', 'content-disposition', 'content-id'], true)) {
                 $keep[] = $line;
                 $hasContentType = $hasContentType || $name === 'content-type';
@@ -182,8 +149,8 @@ class SmimeMailService
             'x-mgw-notification',
         ];
         $keep = [];
-        foreach ($this->headerLines($headerBlock) as $line) {
-            if (! in_array($this->headerName($line), $drop, true)) {
+        foreach (RawMail::headerLines($headerBlock) as $line) {
+            if (! in_array(RawMail::headerName($line), $drop, true)) {
                 $keep[] = $line;
             }
         }
