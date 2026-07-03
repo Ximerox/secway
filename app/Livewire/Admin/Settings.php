@@ -22,6 +22,8 @@ class Settings extends Component
 
     public int $password_delay_minutes = 2;
 
+    public int $reminder_after_hours = 0;
+
     public string $internal_domains = '';
 
     public function mount(): void
@@ -31,6 +33,7 @@ class Settings extends Component
         $this->smime_sign = Setting::getBool('smime_sign', true);
         $this->retention_days = (int) Setting::get('retention_days', config('mailgateway.retention_days'));
         $this->password_delay_minutes = (int) Setting::get('password_delay_minutes', config('mailgateway.password_delay_minutes'));
+        $this->reminder_after_hours = (int) Setting::get('reminder_after_hours', config('mailgateway.reminder_after_hours'));
         $this->internal_domains = (string) Setting::get('internal_domains', config('mailgateway.internal_domains'));
     }
 
@@ -40,6 +43,7 @@ class Settings extends Component
             'subject_tag' => 'required|string|min:2|max:50',
             'retention_days' => 'required|integer|min:1|max:365',
             'password_delay_minutes' => 'required|integer|min:0|max:60',
+            'reminder_after_hours' => 'required|integer|min:0|max:2160',
             'internal_domains' => ['required', 'regex:/^[a-z0-9.-]+(\s*,\s*[a-z0-9.-]+)*$/i'],
         ], [
             'internal_domains.required' => 'Mindestens eine interne Domain wird benötigt (z.B. straphael.de).',
@@ -55,6 +59,7 @@ class Settings extends Component
         Setting::set('smime_sign', $this->smime_sign);
         Setting::set('retention_days', $this->retention_days);
         Setting::set('password_delay_minutes', $this->password_delay_minutes);
+        Setting::set('reminder_after_hours', $this->reminder_after_hours);
         Setting::set('internal_domains', strtolower(trim($this->internal_domains)));
 
         AuditEvent::log('settings_changed', ip: request()->ip(), details: [
@@ -63,6 +68,7 @@ class Settings extends Component
             'smime_sign' => $this->smime_sign,
             'retention_days' => $this->retention_days,
             'password_delay_minutes' => $this->password_delay_minutes,
+            'reminder_after_hours' => $this->reminder_after_hours,
             'internal_domains' => strtolower(trim($this->internal_domains)),
         ]);
 

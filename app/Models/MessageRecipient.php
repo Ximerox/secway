@@ -18,6 +18,7 @@ class MessageRecipient extends Model
             'notified_at' => 'datetime',
             'password_sent_at' => 'datetime',
             'password_due_at' => 'datetime',
+            'reminder_sent_at' => 'datetime',
             'first_viewed_at' => 'datetime',
             'last_viewed_at' => 'datetime',
         ];

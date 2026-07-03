@@ -13,6 +13,9 @@ return [
     // 0 = beide sofort. Der Versand übernimmt der Scheduler (mail:send-passwords).
     'password_delay_minutes' => env('MGW_PASSWORD_DELAY_MINUTES', 2),
 
+    // Erinnerung an nicht abgerufene Portalnachrichten nach X Stunden (0 = aus)
+    'reminder_after_hours' => env('MGW_REMINDER_AFTER_HOURS', 0),
+
     // Auslöse-Tag im Betreff, wird vor der Ablage entfernt
     'subject_tag' => env('MGW_SUBJECT_TAG', '[sicher]'),
 

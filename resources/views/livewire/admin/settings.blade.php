@@ -56,6 +56,12 @@
                     @error('password_delay_minutes')<div class="error">{{ $message }}</div>@enderror
                     <p class="muted" style="margin-top:6px;">Die Kennwort-Mail wird um diese Zeitspanne nach der Link-Mail versendet (0 = beide gleichzeitig). Der Versand erfolgt minutengenau über den Scheduler.</p>
                 </div>
+                <div>
+                    <label>Erinnerung nach (Stunden)</label>
+                    <input type="text" wire:model="reminder_after_hours" style="max-width:120px;">
+                    @error('reminder_after_hours')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">Ruft ein Empfänger seine Nachricht nach dieser Zeit noch nicht ab, erhält er automatisch eine Erinnerung (0 = keine automatische Erinnerung). Manuell lässt sich jederzeit über die Nachrichten-Liste erinnern.</p>
+                </div>
             </div>
         </div>
 
