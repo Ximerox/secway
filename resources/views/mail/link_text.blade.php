@@ -1,6 +1,6 @@
 Guten Tag,
 
-{{ $senderName }} ({{ $senderEmail }}) hat Ihnen eine vertrauliche Nachricht über die sichere Nachrichtenübermittlung von {{ AppModelsSetting::operator() }} gesendet.
+{{ $senderName }} ({{ $senderEmail }}) hat Ihnen eine vertrauliche Nachricht über die sichere Nachrichtenübermittlung von {{ \App\Models\Setting::operator() }} gesendet.
 
 Nachricht abrufen:
 {{ $url }}
