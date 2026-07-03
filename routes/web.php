@@ -6,7 +6,9 @@ use App\Livewire\Admin\Certificates;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\Log;
 use App\Livewire\Admin\Messages;
+use App\Livewire\Admin\Queue as AdminQueue;
 use App\Livewire\Admin\Settings;
+use App\Livewire\Admin\Stats;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -28,7 +30,9 @@ Route::prefix('admin')->group(function () {
     Route::middleware('auth')->group(function () {
         Route::get('/', Dashboard::class)->name('admin.dashboard');
         Route::get('/nachrichten', Messages::class)->name('admin.messages');
+        Route::get('/warteschlange', AdminQueue::class)->name('admin.queue');
         Route::get('/protokoll', Log::class)->name('admin.log');
+        Route::get('/statistik', Stats::class)->name('admin.stats');
         Route::get('/zertifikate', Certificates::class)->name('admin.certs');
         Route::get('/einstellungen', Settings::class)->name('admin.settings');
     });

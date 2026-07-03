@@ -55,7 +55,9 @@
     <span class="brand">St. Raphael · Mailgateway</span>
     <a href="{{ route('admin.dashboard') }}" @class(['active' => request()->routeIs('admin.dashboard')])>Übersicht</a>
     <a href="{{ route('admin.messages') }}" @class(['active' => request()->routeIs('admin.messages')])>Nachrichten</a>
+    <a href="{{ route('admin.queue') }}" @class(['active' => request()->routeIs('admin.queue')])>Warteschlange</a>
     <a href="{{ route('admin.log') }}" @class(['active' => request()->routeIs('admin.log')])>Protokoll</a>
+    <a href="{{ route('admin.stats') }}" @class(['active' => request()->routeIs('admin.stats')])>Statistik</a>
     <a href="{{ route('admin.certs') }}" @class(['active' => request()->routeIs('admin.certs')])>Zertifikate</a>
     <a href="{{ route('admin.settings') }}" @class(['active' => request()->routeIs('admin.settings')])>Einstellungen</a>
     <form method="post" action="{{ route('admin.logout') }}">
