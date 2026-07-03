@@ -17,6 +17,9 @@ Route::get('/', function () {
     ]);
 });
 
+Route::view('/impressum', 'portal.impressum')->name('impressum');
+Route::view('/datenschutz', 'portal.datenschutz')->name('datenschutz');
+
 Route::get('/m/{token}', [PortalController::class, 'show']);
 Route::post('/m/{token}', [PortalController::class, 'unlock'])->middleware('throttle:10,1');
 Route::get('/m/{token}/download/{attachment}', [PortalController::class, 'download'])->middleware('throttle:60,1');

@@ -69,7 +69,11 @@
     <main class="card">
         @yield('content')
     </main>
-    <footer>Vertrauliche Zustellung über mailgateway.straphael.de · Verschlüsselt gespeichert, automatische Löschung nach Ablauf</footer>
+    <footer>
+        Vertrauliche Zustellung über mailgateway.straphael.de · Verschlüsselt gespeichert, automatische Löschung nach Ablauf<br>
+        <a href="{{ url('/impressum') }}" style="color:#6b7280;">Impressum</a> ·
+        <a href="{{ url('/datenschutz') }}" style="color:#6b7280;">Datenschutzerklärung</a>
+    </footer>
 </div>
 </body>
 </html>
