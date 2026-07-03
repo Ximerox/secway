@@ -1,136 +1,127 @@
-# Secure Mail Gateway
+<p align="center">
+  <img src="branding/secway-logo-a-schild.svg" width="96" alt="SecWay logo">
+</p>
 
-E-Mail-Sicherheits-Gateway für Microsoft 365 / Exchange Online — Ersatz für Ciphermail CE.
-Ausgehende Mails werden je nach Empfänger automatisch **S/MIME-verschlüsselt**, über ein
-**Abrufportal mit Kennwort** zugestellt oder unverändert durchgeleitet.
+<h1 align="center">SecWay</h1>
 
-**Stack:** Debian 12/13 · Postfix · PHP 8.4 · Laravel 12 · Livewire 3 · MariaDB · Nginx · Let's Encrypt
-
-> **Status: In aktiver Entwicklung / Pilotbetrieb.** Ausgehende Richtung produktiv,
-> eingehende S/MIME-Entschlüsselung + Zertifikats-Ernten in Planung. Siehe [Roadmap](#roadmap).
+<p align="center">
+  <strong>Secure mail gateway</strong> — transparent S/MIME encryption, signature verification,
+  certificate harvesting and a password-protected recipient portal as fallback.<br>
+  Built with Laravel &amp; Postfix. Designed as a self-hosted replacement for CipherMail.
+</p>
 
 ---
 
-## Funktionsweise
+## What it does
 
+SecWay sits between your mail system (e.g. Exchange Online) and the internet. Every outbound
+message is routed through the gateway, which decides automatically how to deliver it securely —
+senders don't need to install anything, think about certificates or change how they work.
+Recipients with S/MIME get seamless end-to-end encryption; everyone else gets a clean,
+self-hosted web portal. Inbound encrypted mail is decrypted centrally, so it stays readable,
+searchable and archivable in your users' mailboxes.
+
+### Outbound — three-way routing
+
+```mermaid
+flowchart LR
+    EXO[Mail system<br>e.g. Exchange Online] -->|transport rule<br>+ auth header| GW{SecWay}
+    GW -->|"recipient has a certificate"| SMIME[S/MIME encrypt<br>+ optional signature]
+    GW -->|"subject tagged, no certificate"| PORTAL[Encrypted portal storage<br>link mail + delayed password mail]
+    GW -->|otherwise| PASS[Pass through unchanged]
+    SMIME --> OUT[Delivery]
+    PASS --> OUT
 ```
-Outlook/Client ──► Exchange Online ──Transportregel──► Gateway (dieser Server)
-                                                          │
-                       Entscheidung pro Empfänger:        │
-                       1. S/MIME-Zertifikat hinterlegt ──► verschlüsseln (+ signieren) ──► via EXO zustellen
-                       2. Tag im Betreff (z.B. [sicher]) ► Portal: Mail verschlüsselt ablegen,
-                          Empfänger erhält Link-Mail + Kennwort-Mail, Abruf per HTTPS
-                       3. sonst ────────────────────────► unverändert durchleiten ──► via EXO zustellen
-```
 
-- **S/MIME:** sign-then-encrypt (CMS, AES-256). Verschlüsselt wird mit dem Empfänger-Zertifikat
-  (Adress-Zertifikat vor Domain-Zertifikat). Signiert wird nur, wenn der *Absender* ein eigenes
-  Adress-Zertifikat mit privatem Schlüssel besitzt — Domain-Zertifikate signieren nie
-  (die Absenderadresse würde nicht zum Zertifikat passen).
-- **Portal:** Nachricht + Anhänge werden AES-256-GCM-verschlüsselt gespeichert (eigener
-  Datenschlüssel pro Nachricht, eingepackt mit dem Laravel `APP_KEY`). Pro Empfänger eigener
-  Abruf-Token (64 Hex) und eigenes Kennwort (bcrypt-Hash). Sperre nach Fehlversuchen,
-  automatische Löschung nach Ablauf, Inline-Bilder werden im Portal korrekt dargestellt.
-- **Fail-safe:** Scheitert die Verschlüsselung (z.B. abgelaufenes Zertifikat), geht die Mail
-  **ins Portal statt im Klartext raus**. Fehlt der Auth-Header, wird die Zustellung verzögert
-  (TEMPFAIL) statt Mail zu verwerfen.
+- **S/MIME** — if an active certificate exists for the recipient address or domain, the message
+  is encrypted (and optionally signed) automatically. No subject tag needed.
+- **Portal** — if the sender tagged the subject (default `[sicher]`) and no certificate exists,
+  the message and its attachments are stored encrypted on the gateway. The recipient gets a
+  link by mail and — configurable minutes later — a password in a separate mail.
+- **Pass-through** — everything else is delivered unchanged.
 
-## Komponenten
+### Inbound
 
-| Pfad | Zweck |
+Mail addressed to your own domains is decrypted with your own certificates, S/MIME signatures
+are verified (result recorded in an `X-MGW-Signature` header) and sender certificates are
+**harvested** from trusted signatures — so the next reply to that sender is encrypted
+automatically and the encryption loop closes by itself.
+
+## Features
+
+- **Zero client footprint** — no plugins, no per-user setup; routing decisions are automatic
+- **Recipient portal** — token link + password (delivered time-shifted), brute-force lockout,
+  download tracking, automatic reminders, automatic expiry and irreversible deletion
+- **Certificate management** — upload (PFX/PEM) for addresses or whole domains, automatic
+  harvesting from verified inbound signatures, expiry overview
+- **Admin UI** (German) — statistics dashboard, message list with remind/delete, live Postfix
+  queue view with re-deliver/delete, structured audit log grouped per mail, all settings editable
+- **Operations built in** — health monitoring with alerting and mail-loop emergency brake,
+  nightly backups (restore-tested), fail2ban integration, GDPR pages maintainable in the admin UI
+- **Fail-safe by design** — if encryption fails (e.g. expired certificate), the message goes
+  to the portal instead of leaving in plaintext; missing auth header defers (TEMPFAIL) instead
+  of dropping mail; everything the gateway sends is loop-protected via `X-MGW-Notification`
+- **CipherMail-compatible cryptography** — S/MIME sign-then-encrypt with AES-256-CBC content
+  encryption, RSA (PKCS#1 v1.5) key transport, SHA-256 RSA signatures; interoperates with
+  common gateways and mail clients
+
+## Requirements
+
+| Component | Version |
 |---|---|
-| `app/Console/Commands/MailIngest.php` | Postfix-Content-Filter (`mail:ingest`): Auth-Prüfung, Empfänger-Routing |
-| `app/Services/SmimeMailService.php` | S/MIME-Engine (signieren, verschlüsseln, durchleiten, Wiedereinspeisung) |
-| `app/Services/SmimeCertificateService.php` | Zertifikats-Import (PEM/DER/PKCS#12, Kettenerkennung, Validierung) |
-| `app/Console/Commands/MailPurge.php` | Löscht abgelaufene Portalnachrichten (stündlich via Scheduler) |
-| `app/Console/Commands/SmimeImport.php` | CLI-Massenimport von Zertifikaten (`php artisan smime:import`) |
-| `app/Http/Controllers/PortalController.php` | Empfänger-Portal (Kennwort, Anzeige, Download) |
-| `app/Livewire/Admin/*` | Admin-Bereich: Dashboard, Zertifikate, Einstellungen |
-| `app/Models/Setting.php` | Datenbankbasierte Einstellungen (Fallback: `config/mailgateway.php`) |
-| `app/Support/Crypto.php` | AES-256-GCM für Nachrichteninhalte at rest |
+| Debian | 12/13 (other distros work, paths differ) |
+| PHP | 8.3+ (`openssl`, `mbstring`, `xml`, `mysql` extensions) |
+| Laravel | 13 (installed via Composer) |
+| MariaDB | 10.11+ |
+| Postfix | 3.7+ |
+| nginx + certbot | current |
 
-## Admin-Bereich
+A mail system in front (Exchange Online, any SMTP server) that routes outbound mail through
+the gateway and adds the shared-secret header.
 
-`https://<gateway-host>/admin` — Login über die `users`-Tabelle.
+## Installation
 
-- **Übersicht:** Statistiken, Audit-Log (jeder Vorgang wird protokolliert: Ingest, Abruf,
-  Download, Zertifikatsänderungen, Logins, …)
-- **Zertifikate:** Upload PEM/DER/P12 (mit Passwort). Typ *Partner* (nur öffentlicher Schlüssel)
-  oder *Eigenes* (mit privatem Schlüssel, verschlüsselt abgelegt). Ziel: Domain oder einzelne
-  Adresse. Duplikaterkennung per SHA-256-Fingerprint.
-- **Einstellungen:** Auto-Verschlüsselung an/aus, Signieren an/aus, Auslöse-Tag, Aufbewahrungsdauer.
+See **[docs/INSTALL.md](docs/INSTALL.md)** for the full walkthrough (packages, database, nginx,
+Postfix content filter, mail-system connectors, cron, fail2ban, first login).
 
-## Installation (Kurzfassung)
+German operations manual: **[docs/OPERATIONS.de.md](docs/OPERATIONS.de.md)**.
 
-> Ausführliche Schritt-für-Schritt-Anleitung folgt vor der Veröffentlichung.
+## Configuration
 
-1. **Server:** Debian, statische IP, öffentlicher DNS-Eintrag, Portweiterleitungen 25/80/443.
-2. **Pakete:** `nginx php8.4-fpm php8.4-{mysql,mbstring,xml,curl,zip,intl,gd,bcmath} mariadb-server composer certbot python3-certbot-nginx postfix git`
-3. **App:** Projekt nach `/var/www/mailgateway`, `.env` konfigurieren (DB, `APP_URL`,
-   `MAIL_MAILER=sendmail`, `MGW_INGEST_SECRET=<64 Hex-Zeichen>`), `composer install`,
-   `php artisan migrate`, Admin-Benutzer anlegen, Nginx-vHost auf `public/`, Let's-Encrypt-Zertifikat.
-4. **Scheduler:** Cron `* * * * * www-data cd /var/www/mailgateway && php artisan schedule:run`
-5. **Postfix** (Auszug `main.cf` / `master.cf`):
-   ```
-   mynetworks = 127.0.0.0/8 [::1]/128 40.92.0.0/15 40.107.0.0/16 52.100.0.0/14 104.47.0.0/17
-   smtpd_sender_restrictions = check_sender_access hash:/etc/postfix/sender_access, reject
-   relayhost = [<tenant>.mail.protection.outlook.com]:25
-   smtpd_tls_cert_file = /etc/letsencrypt/live/<host>/fullchain.pem   (+ key)
-   smtp_tls_cert_file  = dito  ← Pflicht! EXO identifiziert den Connector am Client-Zertifikat
-   mgwfilter_destination_recipient_limit = 1000
+Defaults live in [`.env.example`](.env.example); everything marked *admin* is maintained at
+runtime under *Admin → Einstellungen* and stored in the database.
 
-   # master.cf:
-   smtp inet n - y - - smtpd -o content_filter=mgwfilter:dummy
-   mgwfilter unix - n n - 10 pipe flags=Rq user=www-data
-     argv=/usr/bin/php -d pcre.jit=0 /var/www/mailgateway/artisan mail:ingest ${queue_id} ${sender} ${recipient}
-   ```
-   `pcre.jit=0` ist Pflicht: die systemd-Härtung von Postfix (`MemoryDenyWriteExecute`)
-   verbietet PHP sonst den JIT-Speicher.
-6. **Exchange Online:**
-   - *Ausgehender Connector* → Smarthost = Gateway-Host, nur über Transportregel, TLS erzwingen
-   - *Eingehender Connector* (OnPremises) → Identifikation über TLS-Zertifikatsnamen des Gateways
-   - *Transportregel:* Bedingung „Absender intern" (+ optionale Pilot-Eingrenzung),
-     **keine Betreff-Bedingung** — die Tag-Logik liegt im Gateway!
-     Aktionen: Header `X-MGW-Auth` = Secret setzen + über Connector routen.
-     Ausnahme: Header `X-MGW-Notification` enthält `yes` (Schleifenschutz — das Gateway
-     markiert alles, was es versendet, mit diesem Header).
+| Setting | Where | Purpose |
+|---|---|---|
+| `MGW_INGEST_SECRET` | `.env` | Shared secret the upstream mail system must send as `X-MGW-Auth` header |
+| Operator name | admin | Name recipients see in the portal and notification mails |
+| Internal domains | admin | Recipients of these domains are treated as **inbound** |
+| Subject tag | admin | Trigger for portal delivery (default `[sicher]`), stripped before delivery |
+| Retention days | admin | Portal storage lifetime, then irreversible deletion |
+| Password delay | admin | Minutes between link mail and password mail |
+| Reminder hours | admin | Auto-remind recipients who haven't picked up (0 = off) |
+| S/MIME auto-encrypt / sign | admin | Encrypt whenever a certificate exists; sign when sender has own key |
+| Impressum / privacy policy | admin | Legal pages served at `/impressum` and `/datenschutz` (HTML) |
 
-## Betrieb
+## Architecture
 
-- **Monitoring:** `/usr/local/sbin/mgw-health.sh` (Cron alle 5 Min): Dienste, Mailqueue,
-  Plattenplatz, Zertifikatslaufzeit, Reboot-Hinweis — Alarm/Entwarnung per E-Mail.
-  **Schleifen-Notbremse:** >100 neue Portalnachrichten in 10 Minuten → Postfix wird gestoppt.
-- **Backup:** `/usr/local/sbin/mgw-backup.sh` (nächtlich): DB-Dump + `.env` (**enthält den
-  `APP_KEY` — ohne ihn sind alle gespeicherten Nachrichten und Schlüssel verloren!**) +
-  Postfix/Nginx/Certbot-Konfiguration nach `/var/backups/mailgateway` (14 Tage; extern sichern!).
-- **Zertifikats-Renewal:** Certbot-Deploy-Hook lädt Nginx **und Postfix** neu.
-- **Härtung:** fail2ban (sshd, postfix; journald-Backend), unattended-upgrades,
-  Absender-Whitelist, EXO-IP-Filter + Secret-Header als zweite Schicht.
+| Piece | Role |
+|---|---|
+| Postfix `smtpd` | Accepts mail from the upstream system, enforces the auth header |
+| `mail:ingest` (pipe filter) | Parses the message, routes S/MIME / portal / pass-through, re-injects |
+| Laravel app | Portal, admin UI, S/MIME services (`app/Services/Smime*`) |
+| Scheduler (cron) | Delayed passwords, reminders, expiry purge |
+| `ops/` scripts | Health check + loop brake, nightly backup, queue-delete helper |
 
-### Audit-Ereignisse (Auszug)
+Message bodies and attachments are stored encrypted at rest (AES-256-GCM with a per-message
+data key, wrapped with the Laravel `APP_KEY`); own private S/MIME keys are stored encrypted;
+portal passwords are stored as bcrypt hashes only. Every action is written to an audit log.
 
-`ingest_stored`, `recipient_notified`, `unlocked`, `unlock_failed`, `downloaded`, `purged`,
-`smime_sent`, `smime_fallback`, `passed_through`, `ingest_rejected` (Auth-Fehler),
-`ingest_loop_dropped` (Schleifenschutz), `cert_imported/…`, `settings_changed`, `admin_login/…`
+## Status & roadmap
 
-## Roadmap
+In production at a German non-profit since 2026. Roadmap: reply-from-portal for external
+recipients, optional AES-GCM/OAEP cipher profile.
 
-- [ ] **S/MIME eingehend:** Entschlüsselung mit eigenen Domain-Zertifikaten, Signaturprüfung,
-      automatisches **Zertifikats-Ernten** aus gültig signierten Mails
-      (EXO-Regel: „Nachrichtentyp ist signiert/verschlüsselt" → Connector)
-- [ ] Automatische Verschlüsselung an geerntete Zertifikate → Ciphermail vollständig ablösen
-- [ ] Admin: Nachrichten-Übersicht, Audit-Browser, Kennwort-Neuversand, Benutzerverwaltung
-- [ ] Web-Formular „sicher senden" (mobiler Fallback / große Anhänge)
-- [ ] **Veröffentlichung:** `.env.example`, Installations-Skript/Anleitung, Seeder für
-      Admin-Benutzer, Secrets-Prüfung, englische Doku, Lizenz — Ziel: GitHub-tauglich,
-      von Dritten nachinstallierbar
+## License
 
-## Sicherheitsmodell (Kurzfassung)
-
-1. Nur EXO-Netze dürfen Port 25 erreichen (`mynetworks`), nur Absender der eigenen Domain.
-2. Jede zu verarbeitende Mail muss den geheimen Header `X-MGW-Auth` tragen (setzt die
-   EXO-Transportregel; verhindert Fremdnutzung durch andere M365-Tenants).
-3. Alles, was das Gateway versendet, trägt `X-MGW-Notification: yes`; solche Mails werden
-   eingehend sofort verworfen und von der EXO-Regel ausgenommen (doppelter Schleifenschutz).
-4. Portalinhalte und private Schlüssel liegen nur verschlüsselt auf der Platte.
-5. Kennwort-Fehlversuche sperren temporär; alle Zugriffe werden auditiert.
+Private repository — all rights reserved (license to be decided before publication).

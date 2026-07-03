@@ -1,0 +1,10 @@
+# SecWay - Cron-Eintraege
+# Nach /etc/cron.d/ kopieren (z. B. als /etc/cron.d/secway) und APP_DIR anpassen.
+
+# Laravel-Scheduler (Kennwort-Versand, Erinnerungen, Aufraeumen)
+* * * * * www-data cd /var/www/secway && php artisan schedule:run >/dev/null 2>&1
+
+# Betrieb (root): Health-Check, Backup, Queue-Loeschhelfer
+*/5 * * * * root /usr/local/sbin/mgw-health.sh
+30 2 * * *  root /usr/local/sbin/mgw-backup.sh
+* * * * *   root /usr/local/sbin/mgw-queue-helper.sh

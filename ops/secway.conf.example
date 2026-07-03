@@ -1,0 +1,30 @@
+# SecWay - Konfiguration der Betriebsskripte (mgw-health.sh, mgw-backup.sh,
+# mgw-queue-helper.sh). Nach /etc/secway.conf kopieren und anpassen.
+
+# Installationsverzeichnis der Anwendung
+APP_DIR=/var/www/secway
+
+# Name der Datenbank
+DB_NAME=secway
+
+# Empfaenger und Absender der Monitoring-/Backup-Alarme
+ALERT_TO=admin@example.org
+ALERT_FROM="SecWay Monitoring <secway@example.org>"
+
+# TLS-Zertifikat des Portals (fuer die Ablauf-Warnung)
+TLS_CERT=/etc/letsencrypt/live/secway.example.org/fullchain.pem
+
+# Name des PHP-FPM-Dienstes
+PHP_FPM_SERVICE=php8.4-fpm
+
+# Backup-Ziel und Aufbewahrung
+BACKUP_DIR=/var/backups/secway
+BACKUP_KEEP_DAYS=14
+
+# Alarm-Schwellen
+QUEUE_ALERT_THRESHOLD=200
+DISK_ALERT_PCT=85
+
+# Schleifen-Notbremse: mehr neue Portal-Nachrichten als dieser Wert in
+# 10 Minuten -> Postfix wird gestoppt und alarmiert
+LOOP_BRAKE_THRESHOLD=100
