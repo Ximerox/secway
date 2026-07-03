@@ -14,6 +14,7 @@ use App\Services\SmimeInboundService;
 use App\Services\SmimeMailService;
 use App\Support\Crypto;
 use App\Support\InternalDomains;
+use App\Support\RawMail;
 use App\Support\SubjectTag;
 use Illuminate\Console\Command;
 use Illuminate\Database\QueryException;
@@ -130,6 +131,7 @@ class MailIngest extends Command
                 'sender' => $sender,
                 'recipients' => $inboundRcpts,
                 'status' => $status,
+                'content_type' => mb_substr((string) RawMail::findHeader(RawMail::split($raw)[0], 'content-type'), 0, 300),
             ]);
         }
 

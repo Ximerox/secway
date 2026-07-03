@@ -7,6 +7,7 @@ use App\Models\SmimeCertificate;
 use App\Support\RawMail;
 use Illuminate\Support\Carbon;
 use RuntimeException;
+use ZBateson\MailMimeParser\Message;
 
 /**
  * Verarbeitet eingehende Mails an interne Empfänger:
@@ -37,36 +38,76 @@ class SmimeInboundService
     {
         $status = [];
         [$topHeaders] = RawMail::split($raw);
+        [$kind, $smimeFile] = $this->locateSmime($raw, $topHeaders, $tmpDir);
+        $decryptedEntity = null;
 
-        $currentFile = $tmpDir.'/current.eml';
-        file_put_contents($currentFile, $raw);
-        $decrypted = false;
-
-        // 1) Entschlüsseln (application/pkcs7-mime, enveloped-data)
-        if ($this->contentKind($topHeaders) === 'encrypted') {
+        // 1) Entschlüsseln (direkt oder aus Multipart-Hülle ausgepackt)
+        if ($kind === 'encrypted' || $kind === 'encrypted-wrapped') {
             $out = $tmpDir.'/decrypted.eml';
-            if ($this->tryDecrypt($currentFile, $out, $tmpDir)) {
-                $status[] = 'decrypted';
-                $currentFile = $out;
-                $decrypted = true;
+            if ($this->tryDecrypt($smimeFile, $out, $tmpDir)) {
+                $status[] = $kind === 'encrypted-wrapped' ? 'unwrapped_decrypted' : 'decrypted';
+                $decryptedEntity = file_get_contents($out);
+
+                // 2a) Innen signiert? Dann prüfen + ernten
+                $innerKind = $this->contentKind(RawMail::split($decryptedEntity)[0]);
+                if ($innerKind === 'multipart-signed' || $innerKind === 'opaque-signed') {
+                    $status[] = $this->verifyAndHarvest($out, $sender, $tmpDir);
+                }
             } else {
                 // Kein passender Schlüssel: unverändert zustellen statt Mail zu verlieren
-                $status[] = 'decrypt_failed'.$this->describeRecipientInfos($currentFile);
+                $status[] = 'decrypt_failed'.$this->describeRecipientInfos($smimeFile);
             }
         }
-
-        // 2) Signatur prüfen + Zertifikat ernten
-        $innerHeaders = $decrypted ? RawMail::split(file_get_contents($currentFile))[0] : $topHeaders;
-        $kind = $this->contentKind($innerHeaders);
-        if ($kind === 'multipart-signed' || $kind === 'opaque-signed') {
-            $status[] = $this->verifyAndHarvest($currentFile, $sender, $tmpDir);
+        // 2b) Nur signiert (direkt oder ausgepackt)
+        elseif ($kind === 'multipart-signed' || $kind === 'opaque-signed' || $kind === 'opaque-signed-wrapped') {
+            $status[] = $this->verifyAndHarvest($smimeFile, $sender, $tmpDir);
         }
 
         // 3) Zustellen
-        $final = $this->compose($topHeaders, $raw, $decrypted ? file_get_contents($currentFile) : null, $status);
+        $final = $this->compose($topHeaders, $raw, $decryptedEntity, $status);
         RawMail::submit($final, $sender, $recipients);
 
         return $status;
+    }
+
+    /**
+     * Findet den S/MIME-Inhalt: entweder direkt auf oberster Ebene oder —
+     * wie von Exchange nach Transportregel-Änderungen erzeugt — als
+     * smime.p7m-Teil in einer multipart-Hülle.
+     *
+     * @return array{0: ?string, 1: ?string} [Art, Dateipfad]
+     */
+    private function locateSmime(string $raw, string $topHeaders, string $tmpDir): array
+    {
+        $kind = $this->contentKind($topHeaders);
+        if ($kind !== null) {
+            $file = $tmpDir.'/current.eml';
+            file_put_contents($file, $raw);
+
+            return [$kind, $file];
+        }
+
+        foreach (Message::from($raw, false)->getAllParts() as $part) {
+            $ct = strtolower((string) $part->getContentType());
+            $name = strtolower((string) $part->getFilename());
+            if (! str_contains($ct, 'pkcs7-mime') && ! str_ends_with($name, '.p7m')) {
+                continue;
+            }
+            $content = $part->getContent();
+            if ($content === null || $content === '') {
+                continue;
+            }
+            $smimeType = str_contains($ct, 'signed-data') ? 'signed-data' : 'enveloped-data';
+            $file = $tmpDir.'/unwrapped.eml';
+            file_put_contents($file,
+                'Content-Type: application/pkcs7-mime; smime-type='.$smimeType.'; name="smime.p7m"'."\n".
+                'Content-Transfer-Encoding: base64'."\n\n".
+                chunk_split(base64_encode($content), 64, "\n"));
+
+            return [$smimeType === 'signed-data' ? 'opaque-signed-wrapped' : 'encrypted-wrapped', $file];
+        }
+
+        return [null, null];
     }
 
     /** Erkennt die S/MIME-Art anhand des Content-Type-Headers. */
