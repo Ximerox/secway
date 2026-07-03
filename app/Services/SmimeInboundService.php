@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AuditEvent;
+use App\Models\Setting;
 use App\Models\SmimeCertificate;
 use App\Support\RawMail;
 use Illuminate\Support\Carbon;
@@ -12,9 +13,12 @@ use ZBateson\MailMimeParser\Message;
 /**
  * Verarbeitet eingehende Mails an interne Empfänger:
  *  - S/MIME-verschlüsselte Mails werden mit den eigenen Zertifikaten entschlüsselt
- *  - Signaturen werden geprüft; Absender-Zertifikate werden geerntet
- *    (kettengeprüft → sofort aktiv, sonst inaktiv zur manuellen Freigabe)
- *  - Zustellung dann im Klartext (Signatur bleibt für den Client erhalten)
+ *  - Signaturen werden geprüft und das Ergebnis als X-MGW-Signature-Kopfzeile vermerkt;
+ *    Absender-Zertifikate werden geerntet (kettengeprüft → aktiv, sonst inaktiv)
+ *  - Ausgeliefert wird die verifizierte Nutzlast im Klartext. Die Signatur-Hülle
+ *    wird dabei entfernt: Sie ließe sich durch das Entschlüsseln + Umverpacken
+ *    ohnehin nicht zuverlässig gültig halten, und der Client zeigt sie sonst als
+ *    defekten „smime.p7s"-Anhang. Das Prüfergebnis steht in der Kopfzeile.
  */
 class SmimeInboundService
 {
@@ -36,22 +40,37 @@ class SmimeInboundService
 
     private function doProcess(string $raw, string $sender, array $recipients, string $tmpDir): array
     {
+        // Debug-Mitschrift (Admin-Setting debug_inbound), zur Analyse von Verpackungsvarianten
+        if (Setting::getBool('debug_inbound', false)) {
+            $dir = storage_path('app/debug');
+            if (! is_dir($dir)) {
+                mkdir($dir, 0700, true);
+            }
+            file_put_contents($dir.'/in-'.date('Ymd-His').'-'.bin2hex(random_bytes(3)).'.eml', $raw);
+        }
+
         $status = [];
         [$topHeaders] = RawMail::split($raw);
         [$kind, $smimeFile] = $this->locateSmime($raw, $topHeaders, $tmpDir);
-        $decryptedEntity = null;
+
+        $deliverEntity = null;   // ersetzt Body + Content-Header, wenn gesetzt
+        $sigHeader = null;       // X-MGW-Signature-Wert
 
         // 1) Entschlüsseln (direkt oder aus Multipart-Hülle ausgepackt)
         if ($kind === 'encrypted' || $kind === 'encrypted-wrapped') {
             $out = $tmpDir.'/decrypted.eml';
             if ($this->tryDecrypt($smimeFile, $out, $tmpDir)) {
                 $status[] = $kind === 'encrypted-wrapped' ? 'unwrapped_decrypted' : 'decrypted';
-                $decryptedEntity = file_get_contents($out);
+                $deliverEntity = file_get_contents($out);
 
-                // 2a) Innen signiert? Dann prüfen + ernten
-                $innerKind = $this->contentKind(RawMail::split($decryptedEntity)[0]);
-                if ($innerKind === 'multipart-signed' || $innerKind === 'opaque-signed') {
-                    $status[] = $this->verifyAndHarvest($out, $sender, $tmpDir);
+                // 2a) Innen signiert? Dann prüfen, ernten und Signatur-Hülle entfernen
+                if ($this->isSigned(RawMail::split($deliverEntity)[0])) {
+                    [$sigStatus, $content] = $this->verifyAndHarvest($out, $sender, $tmpDir);
+                    $status[] = $sigStatus;
+                    $sigHeader = $this->signatureHeader($sigStatus, $sender);
+                    if ($content !== null) {
+                        $deliverEntity = $content;
+                    }
                 }
             } else {
                 // Kein passender Schlüssel: unverändert zustellen statt Mail zu verlieren
@@ -60,11 +79,16 @@ class SmimeInboundService
         }
         // 2b) Nur signiert (direkt oder ausgepackt)
         elseif ($kind === 'multipart-signed' || $kind === 'opaque-signed' || $kind === 'opaque-signed-wrapped') {
-            $status[] = $this->verifyAndHarvest($smimeFile, $sender, $tmpDir);
+            [$sigStatus, $content] = $this->verifyAndHarvest($smimeFile, $sender, $tmpDir);
+            $status[] = $sigStatus;
+            $sigHeader = $this->signatureHeader($sigStatus, $sender);
+            if ($content !== null) {
+                $deliverEntity = $content;
+            }
         }
 
         // 3) Zustellen
-        $final = $this->compose($topHeaders, $raw, $decryptedEntity, $status);
+        $final = $this->compose($topHeaders, $raw, $deliverEntity, $status, $sigHeader);
         RawMail::submit($final, $sender, $recipients);
 
         return $status;
@@ -127,6 +151,13 @@ class SmimeInboundService
         return null;
     }
 
+    private function isSigned(string $headerBlock): bool
+    {
+        $kind = $this->contentKind($headerBlock);
+
+        return $kind === 'multipart-signed' || $kind === 'opaque-signed';
+    }
+
     /** Probiert alle eigenen Zertifikate mit privatem Schlüssel durch. */
     private function tryDecrypt(string $inFile, string $outFile, string $tmpDir): bool
     {
@@ -174,37 +205,44 @@ class SmimeInboundService
         return ' (verschlüsselt an: '.implode(' | ', array_unique($targets)).')';
     }
 
-    private function verifyAndHarvest(string $file, string $sender, string $tmpDir): string
+    /**
+     * Prüft die Signatur, erntet ggf. das Absender-Zertifikat und liefert
+     * die signierte Nutzlast zurück (ohne Signatur-Hülle).
+     *
+     * @return array{0: string, 1: ?string} [Statuscode, Nutzlast oder null]
+     */
+    private function verifyAndHarvest(string $file, string $sender, string $tmpDir): array
     {
         $signerFile = $tmpDir.'/signer.pem';
-        if (@openssl_pkcs7_verify($file, PKCS7_NOVERIFY, $signerFile) !== true) {
-            return 'signature_invalid';
-        }
+        $contentFile = $tmpDir.'/signed-content.eml';
 
-        // Kettenprüfung gegen die System-CAs entscheidet, ob das geerntete
-        // Zertifikat sofort aktiv wird oder zur manuellen Freigabe ruht
+        // NOVERIFY = nur kryptografische Prüfung; schreibt zugleich die Nutzlast heraus
+        if (@openssl_pkcs7_verify($file, PKCS7_NOVERIFY, $signerFile, [], null, $contentFile) !== true) {
+            return ['signature_invalid', null];
+        }
+        $content = is_file($contentFile) ? file_get_contents($contentFile) : null;
+
+        // Kettenprüfung gegen die System-CAs → aktiv vs. manuelle Freigabe
         $chainOk = @openssl_pkcs7_verify($file, 0, $tmpDir.'/signer-chain.pem', ['/etc/ssl/certs/ca-certificates.crt']) === true;
 
         $pem = (string) file_get_contents($signerFile);
         $x509 = @openssl_x509_read($pem);
         if ($x509 === false) {
-            return $chainOk ? 'signed_valid' : 'signed_untrusted';
+            return [$chainOk ? 'signed_valid' : 'signed_untrusted', $content];
         }
         $info = openssl_x509_parse($x509);
 
-        // Zertifikat muss auf die Absenderadresse lauten
         if (! in_array(strtolower($sender), $this->certEmails($info), true)) {
-            return ($chainOk ? 'signed_valid' : 'signed_untrusted').'_address_mismatch';
+            return [($chainOk ? 'signed_valid' : 'signed_untrusted').'_address_mismatch', $content];
         }
 
-        // Gültigkeitsfenster + Duplikate
         $now = time();
         if (($info['validFrom_time_t'] ?? 0) > $now || ($info['validTo_time_t'] ?? PHP_INT_MAX) < $now) {
-            return 'signed_cert_expired';
+            return ['signed_cert_expired', $content];
         }
         $fingerprint = openssl_x509_fingerprint($x509, 'sha256');
         if (SmimeCertificate::where('fingerprint', $fingerprint)->exists()) {
-            return $chainOk ? 'signed_valid' : 'signed_untrusted';
+            return [$chainOk ? 'signed_valid' : 'signed_untrusted', $content];
         }
 
         SmimeCertificate::create([
@@ -226,7 +264,29 @@ class SmimeInboundService
             'active' => $chainOk,
         ]);
 
-        return $chainOk ? 'signed_valid_harvested' : 'signed_untrusted_harvested';
+        return [$chainOk ? 'signed_valid_harvested' : 'signed_untrusted_harvested', $content];
+    }
+
+    /** Menschenlesbarer X-MGW-Signature-Wert aus dem Statuscode. */
+    private function signatureHeader(string $status, string $sender): string
+    {
+        if ($status === 'signature_invalid') {
+            return 'INVALID (Signatur kryptografisch ungültig)';
+        }
+        if (str_contains($status, 'address_mismatch')) {
+            return "invalid (Signatur-Zertifikat lautet nicht auf {$sender})";
+        }
+        if ($status === 'signed_cert_expired') {
+            return "expired (Signatur-Zertifikat von {$sender} abgelaufen)";
+        }
+        if (str_starts_with($status, 'signed_valid')) {
+            return "valid (signiert von {$sender}, Zertifikatskette vertrauenswürdig)";
+        }
+        if (str_starts_with($status, 'signed_untrusted')) {
+            return "valid-untrusted (signiert von {$sender}, Aussteller nicht im Vertrauensspeicher)";
+        }
+
+        return $status;
     }
 
     /** E-Mail-Adressen aus Subject (emailAddress) und SubjectAltName. */
@@ -260,17 +320,19 @@ class SmimeInboundService
 
     /**
      * Baut die Zustellfassung: Original-Kopfzeilen (bereinigt) + ggf.
-     * entschlüsselter Inhalt, Marker- und Status-Header.
+     * verarbeiteter Inhalt, Marker-, Status- und Signatur-Header.
+     * Das Ergebnis wird durchgängig auf CRLF normalisiert.
      */
-    private function compose(string $topHeaders, string $raw, ?string $decryptedEntity, array $status): string
+    private function compose(string $topHeaders, string $raw, ?string $deliverEntity, array $status, ?string $sigHeader): string
     {
         $drop = [
             strtolower((string) config('mailgateway.secret_header')),
             'x-mgw-notification',
             'x-mgw-status',
+            'x-mgw-signature',
         ];
-        if ($decryptedEntity !== null) {
-            // Content-Header beschreibt jetzt der entschlüsselte Teil selbst
+        if ($deliverEntity !== null) {
+            // Content-Header beschreibt jetzt die ausgelieferte Nutzlast selbst
             array_push($drop, 'content-type', 'content-transfer-encoding', 'content-disposition', 'content-id');
         }
 
@@ -284,13 +346,18 @@ class SmimeInboundService
         if ($status !== []) {
             $keep[] = 'X-MGW-Status: '.implode(', ', $status);
         }
-
-        if ($decryptedEntity !== null) {
-            return implode("\n", $keep)."\n".$decryptedEntity;
+        if ($sigHeader !== null) {
+            $keep[] = 'X-MGW-Signature: '.$sigHeader;
         }
 
-        [, $body] = RawMail::split($raw);
+        if ($deliverEntity !== null) {
+            $message = implode("\n", $keep)."\n".$deliverEntity;
+        } else {
+            [, $body] = RawMail::split($raw);
+            $message = implode("\n", $keep)."\n\n".$body;
+        }
 
-        return implode("\n", $keep)."\n\n".$body;
+        // Einheitliche CRLF-Zeilenenden (SMTP-konform)
+        return preg_replace('/\r\n|\r|\n/', "\r\n", $message);
     }
 }
