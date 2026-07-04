@@ -11,6 +11,21 @@
     @endif
 
     <div class="card">
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            <div>
+                <strong>Signatur-Modul:</strong>
+                @if ($module_enabled) <span class="badge ok">eingeschaltet</span>
+                @else <span class="badge off">ausgeschaltet</span>
+                @endif
+            </div>
+            <label style="display:flex; gap:8px; align-items:center; margin:0;">
+                <input type="checkbox" wire:model.live="module_enabled" style="width:auto;">
+                Mails verarbeiten (aktive Vorlagen anwenden)
+            </label>
+        </div>
+    </div>
+
+    <div class="card">
         <div style="display:flex; align-items:center;">
             <h2 style="margin:0;">Vorlagen</h2>
             <button class="btn" style="margin-left:auto;" wire:click="create">Neue Vorlage</button>

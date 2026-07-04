@@ -10,6 +10,7 @@ use App\Models\MessageRecipient;
 use App\Models\SecureMessage;
 use App\Models\Setting;
 use App\Models\SmimeCertificate;
+use App\Services\SignatureMailService;
 use App\Services\SmimeInboundService;
 use App\Services\SmimeMailService;
 use App\Support\Crypto;
@@ -113,6 +114,43 @@ class MailIngest extends Command
             Log::warning("mail:ingest {$queueId}: Auth-{$reason} (Absender {$sender}) — Zustellung verzögert (TEMPFAIL)");
 
             return self::EX_TEMPFAIL;
+        }
+
+        // Signatur-Modul: Signaturen VOR dem Routing anhängen, damit alle Wege
+        // (S/MIME, Portal, PassThrough) die signierte Fassung verwenden.
+        // Nur für interne Absender, komplett hinter dem Setting signature_enabled.
+        if (Setting::getBool('signature_enabled', false) && InternalDomains::isInternal($sender)) {
+            try {
+                $sig = app(SignatureMailService::class)->apply($raw, $sender, $recipients);
+                if ($sig['applied'] !== []) {
+                    $raw = $sig['raw'];
+                    $parsed = Message::from($raw, false);
+                    AuditEvent::log('signature_applied', details: [
+                        'queue_id' => $queueId,
+                        'sender' => $sender,
+                        'recipients' => $recipients,
+                        'templates' => $sig['applied'],
+                        'mode' => $sig['replaced'] ? 'ersetzt' : 'angehängt',
+                        'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
+                    ]);
+                } elseif ($sig['skipped'] !== null) {
+                    AuditEvent::log('signature_skipped', details: [
+                        'queue_id' => $queueId,
+                        'sender' => $sender,
+                        'recipients' => $recipients,
+                        'reason' => $sig['skipped'],
+                        'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
+                    ]);
+                }
+            } catch (Throwable $e) {
+                // Signaturfehler dürfen NIE den Mailfluss anhalten — Original weiterverwenden
+                Log::error("mail:ingest {$queueId}: Signatur-Modul fehlgeschlagen (Mail unverändert weiterverarbeitet): ".$e->getMessage());
+                AuditEvent::log('signature_failed', details: [
+                    'queue_id' => $queueId,
+                    'sender' => $sender,
+                    'reason' => mb_substr($e->getMessage(), 0, 500),
+                ]);
+            }
         }
 
         // Empfänger aufteilen (Verhalten über Admin-Einstellungen steuerbar):

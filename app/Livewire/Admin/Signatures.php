@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Mail\SignatureTestMail;
 use App\Models\AuditEvent;
 use App\Models\EntraUser;
+use App\Models\Setting;
 use App\Models\SignatureImage;
 use App\Models\SignatureTemplate;
 use App\Services\GraphClient;
@@ -80,9 +81,21 @@ class Signatures extends Component
 
     public string $test_to = '';
 
+    public bool $module_enabled = false;
+
     public function mount(): void
     {
         $this->preview_user = (string) (EntraUser::orderBy('display_name')->value('mail') ?? '');
+        $this->module_enabled = Setting::getBool('signature_enabled', false);
+    }
+
+    public function updatedModuleEnabled(): void
+    {
+        Setting::set('signature_enabled', $this->module_enabled);
+        AuditEvent::log('settings_changed', ip: request()->ip(), details: ['signature_enabled' => $this->module_enabled]);
+        session()->flash('ok', $this->module_enabled
+            ? 'Signatur-Modul EINGESCHALTET — aktive Vorlagen werden ab sofort auf passende Mails angewandt.'
+            : 'Signatur-Modul ausgeschaltet — es werden keine Signaturen mehr angehängt.');
     }
 
     /** Gruppen des Tenants für das Regel-Dropdown (10 Min gecacht). */
