@@ -83,7 +83,8 @@ class SignatureMailService
         }
 
         // Signaturen rendern (in Regel-Reihenfolge), Bilder einsammeln
-        $skipMode = $templates->first()->existing_mode === 'skip';
+        $mode = $templates->first()->existing_mode; // skip | replace | replace_all
+        $skipMode = $mode === 'skip';
         $sigHtml = '';
         $sigText = '';
         $images = [];
@@ -99,13 +100,17 @@ class SignatureMailService
         if ($html !== null && trim($html) !== '') {
             $quotePos = $this->firstMatchPos($html, self::HTML_QUOTE_PATTERNS) ?? $this->htmlFallbackPos($html);
 
-            // Vorhandene eigene Signaturen NUR im neuen Textbereich beachten
-            $ownBlocks = $this->markerBlocksBefore($html, $quotePos);
-            if ($ownBlocks !== [] && $skipMode) {
+            // Vorhandene eigene Signaturen: skip/replace zählen nur den neuen
+            // Textbereich; replace_all räumt Marker-Blöcke auch aus dem Zitat.
+            $newRegionBlocks = $this->markerBlocksBefore($html, $quotePos);
+            if ($newRegionBlocks !== [] && $skipMode) {
                 return $none('Signatur bereits vorhanden (Vorlage steht auf „überspringen")');
             }
-            if ($ownBlocks !== []) {
-                $html = $this->removeBlocks($html, $ownBlocks);
+            $toRemove = $mode === 'replace_all'
+                ? $this->markerBlocksBefore($html, PHP_INT_MAX)
+                : $newRegionBlocks;
+            if ($toRemove !== []) {
+                $html = $this->removeBlocks($html, $toRemove);
                 $replaced = true;
                 $quotePos = $this->firstMatchPos($html, self::HTML_QUOTE_PATTERNS) ?? $this->htmlFallbackPos($html);
             }

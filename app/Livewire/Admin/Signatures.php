@@ -170,7 +170,7 @@ class Signatures extends Component
     {
         $this->validate([
             'name' => 'required|string|min:2|max:100',
-            'existing_mode' => 'in:skip,replace',
+            'existing_mode' => 'in:skip,replace,replace_all',
             'html' => 'required|string|max:300000',
             'text_body' => 'nullable|string|max:20000',
             'priority' => 'required|integer|min:1|max:999',

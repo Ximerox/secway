@@ -73,11 +73,16 @@
                     @error('name')<div class="error">{{ $message }}</div>@enderror
                 </div>
                 <div>
-                    <label>Wenn bereits eine Signatur in der Mail steckt (Antwortverlauf)</label>
+                    <label>Wenn bereits eine Signatur in der Mail steckt</label>
                     <select wire:model="existing_mode">
-                        <option value="replace">Alte entfernen und an aktueller Stelle neu einfügen</option>
+                        <option value="replace">Im neuen Text ersetzen, zitierten Verlauf unangetastet lassen</option>
+                        <option value="replace_all">Ersetzen und auch aus dem zitierten Verlauf entfernen</option>
                         <option value="skip">Nicht erneut anhängen</option>
                     </select>
+                    <div class="muted" style="margin-top:4px;">
+                        „Auch aus dem Verlauf entfernen" räumt frühere SecWay-Signaturen aus Zitaten —
+                        fremde Signaturen (z.B. aus der CodeTwo-Zeit) bleiben stehen, die sind nicht markiert.
+                    </div>
                 </div>
             </div>
 
