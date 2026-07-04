@@ -47,6 +47,18 @@ are verified (result recorded in an `X-MGW-Signature` header) and sender certifi
 **harvested** from trusted signatures — so the next reply to that sender is encrypted
 automatically and the encryption loop closes by itself.
 
+### Signature blocks (optional) — self-hosted CodeTwo alternative
+
+An optional module appends a server-side **signature block** (the footer at the end of a mail)
+to outbound messages, filled per sender with attributes from **Entra ID** (Microsoft 365) via
+Microsoft Graph. WYSIWYG editor (self-hosted TinyMCE), placeholders with conditional blocks,
+inline images and **QR codes** (e.g. vCard) embedded per sender, and rules per block
+(sender/recipient include+exclude, internal/external direction, validity period, priority,
+continue-or-stop). Optionally it also **updates the sent copy** in the user's *Sent Items*
+folder with the signed version. Disabled by default; needs no extra Exchange rule (it runs on
+mail already routed through the gateway). "Signature block" is deliberately distinct from the
+cryptographic S/MIME **signing** above.
+
 ## Features
 
 - **Zero client footprint** — no plugins, no per-user setup; routing decisions are automatic
@@ -64,13 +76,15 @@ automatically and the encryption loop closes by itself.
 - **CipherMail-compatible cryptography** — S/MIME sign-then-encrypt with AES-256-CBC content
   encryption, RSA (PKCS#1 v1.5) key transport, SHA-256 RSA signatures; interoperates with
   common gateways and mail clients
+- **Signature-block module** (optional) — server-side e-mail footers from Entra ID with
+  placeholders, rules, inline images, per-sender QR codes and optional Sent-Items update
 
 ## Requirements
 
 | Component | Version |
 |---|---|
 | Debian | 12/13 (other distros work, paths differ) |
-| PHP | 8.3+ (`openssl`, `mbstring`, `xml`, `mysql` extensions) |
+| PHP | 8.3+ (`openssl`, `mbstring`, `xml`, `curl`, `mysql`, `intl`, `bcmath`, `zip`, `gd`) |
 | Laravel | 13 (installed via Composer) |
 | MariaDB | 10.11+ |
 | Postfix | 3.7+ |
@@ -78,6 +92,10 @@ automatically and the encryption loop closes by itself.
 
 A mail system in front (Exchange Online, any SMTP server) that routes outbound mail through
 the gateway and adds the shared-secret header.
+
+The **signature-block module** additionally needs the `gd` PHP extension (QR codes), a
+one-time TinyMCE download (see INSTALL) and a Microsoft Graph app registration; it is optional
+and off by default.
 
 ## Installation
 
@@ -102,6 +120,11 @@ runtime under *Admin → Einstellungen* and stored in the database.
 | Reminder hours | admin | Auto-remind recipients who haven't picked up (0 = off) |
 | S/MIME auto-encrypt / sign | admin | Encrypt whenever a certificate exists; sign when sender has own key |
 | Impressum / privacy policy | admin | Legal pages served at `/impressum` and `/datenschutz` (HTML) |
+| `GRAPH_*` | `.env` | Microsoft Graph app credentials for the signature-block module (optional) |
+| Signature blocks + rules | admin | Templates, per-sender/recipient rules, images, QR codes, on/off, Sent-Items update |
+
+Admin login is by **username** (created at install, changeable under *Admin → Konto* together
+with the password).
 
 ## Architecture
 
@@ -110,7 +133,8 @@ runtime under *Admin → Einstellungen* and stored in the database.
 | Postfix `smtpd` | Accepts mail from the upstream system, enforces the auth header |
 | `mail:ingest` (pipe filter) | Parses the message, routes S/MIME / portal / pass-through, re-injects |
 | Laravel app | Portal, admin UI, S/MIME services (`app/Services/Smime*`) |
-| Scheduler (cron) | Delayed passwords, reminders, expiry purge |
+| Scheduler (cron) | Delayed passwords, reminders, expiry purge, hourly Entra sync, Sent-Items update |
+| Signature-block module | `app/Services/Signature*`, Microsoft Graph client, TinyMCE editor, QR via `endroid/qr-code` |
 | `ops/` scripts | Health check + loop brake, nightly backup, queue-delete helper |
 
 Message bodies and attachments are stored encrypted at rest (AES-256-GCM with a per-message
@@ -119,8 +143,9 @@ portal passwords are stored as bcrypt hashes only. Every action is written to an
 
 ## Status & roadmap
 
-In production at a German non-profit since 2026. Roadmap: reply-from-portal for external
-recipients, optional AES-GCM/OAEP cipher profile.
+In production at a German non-profit since 2026, including the signature-block module.
+Roadmap: signing internal-to-internal mail (needs the routing rule widened to internal
+recipients), reply-from-portal for external recipients, optional AES-GCM/OAEP cipher profile.
 
 ## License
 

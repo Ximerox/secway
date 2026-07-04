@@ -18,7 +18,10 @@ um 2:30 Uhr automatisch.
 | **Warteschlange** | Postfix-Queue live mit Fehlergrund — *Erneut zustellen* / *Löschen*; darunter wartende Kennwort-Mails mit *Jetzt senden* |
 | **Protokoll** | Alle Ereignisse, nach Vorgang gruppiert, mit Richtung/Von/An, filter- und durchsuchbar |
 | **Zertifikate** | Eigene und Partner-Zertifikate, Upload, geerntete Zertifikate |
+| **Signaturblöcke** | Modul-Schalter, Vorlagen (eigene Editor-Seite mit Tabs), Bilder & QR — serverseitige E-Mail-Fußzeilen aus Entra-Daten |
+| **Benutzer** | Aus Entra ID synchronisierte Benutzer (Cache), Sync-Filter, „Jetzt synchronisieren" |
 | **Einstellungen** | Alles Konfigurierbare inkl. Betreibername und Impressum/Datenschutz |
+| **Konto** | Eigenen Benutzernamen/Anzeigenamen und das Kennwort ändern |
 
 ## Warnmeldungen und was zu tun ist
 
@@ -87,4 +90,14 @@ Betriebssystem-Sicherheitsupdates installiert `unattended-upgrades` automatisch;
   „Erinnerung nach (Stunden)").
 - **Kennwort-Mail sofort auslösen:** Admin → Warteschlange → *Jetzt senden*.
 - **Impressum/Datenschutz ändern:** Admin → Einstellungen → HTML-Felder unten.
-- **Neuer Admin-Benutzer:** derzeit per Tinker (siehe INSTALL.md Schritt 3).
+- **Eigenes Kennwort / Benutzername ändern:** Admin → Konto.
+- **Weiteren Admin-Benutzer anlegen:** per Tinker (siehe INSTALL.md, „First admin user").
+- **Signaturblock anlegen/ändern:** Admin → Signaturblöcke → *Neuer Signaturblock* (Tabs für
+  Inhalt, Absender, Empfänger, Zeitraum & Logik, Bilder & QR, Vorschau). Wirkt erst, wenn die
+  Vorlage *aktiv* und das Modul oben *eingeschaltet* ist.
+- **Entra-Benutzer aktualisieren:** läuft stündlich automatisch; manuell über Admin → Benutzer
+  → *Jetzt synchronisieren*.
+- **Graph-Client-Secret erneuern:** Das Secret der Entra-App-Registrierung läuft ab (Ablauf im
+  Kalender notieren!). Neues Secret in Entra erzeugen, in `.env` (`GRAPH_CLIENT_SECRET`)
+  eintragen, dann `php artisan config:cache`. Symptom bei abgelaufenem Secret: Sync/QR schlagen
+  fehl, Protokoll zeigt Graph-Fehler.

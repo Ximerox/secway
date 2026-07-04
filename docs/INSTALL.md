@@ -4,6 +4,12 @@ Step-by-step guide for Debian 12/13. Adjust paths and package names for other di
 Throughout this guide the app lives in `/var/www/secway` and the portal is reachable at
 `https://secway.example.org`.
 
+> **Shortcut:** `deploy/install.sh` automates the server-side application setup (packages,
+> database, `.env`, `APP_KEY`, TinyMCE, migrations, admin user, ops scripts). Run it first,
+> then complete the parts it cannot do for you — nginx/TLS, Postfix, the Exchange Online
+> connectors and (optionally) the Entra app — using the sections below. Everything the script
+> does is also documented here so you can do it by hand or understand what happened.
+
 ## 0. Prerequisites
 
 - A server with a static IP, a public DNS record and open ports **25, 80, 443**
@@ -17,8 +23,12 @@ Throughout this guide the app lives in `/var/www/secway` and the portal is reach
 ```bash
 apt install nginx php8.4-fpm php8.4-{mysql,mbstring,xml,curl,zip,intl,gd,bcmath} \
     mariadb-server composer certbot python3-certbot-nginx postfix git fail2ban \
-    unattended-upgrades swaks
+    unattended-upgrades swaks curl
 ```
+
+Required PHP extensions: `openssl`, `mbstring`, `xml`/`dom`, `curl`, `mysql` (PDO),
+`intl`, `bcmath`, `zip`, and **`gd`** (the last is needed for QR codes in the signature-block
+module). `openssl` powers all S/MIME operations and is part of PHP's core build on Debian.
 
 ## 2. Database
 
@@ -42,19 +52,50 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 chown -R www-data:www-data /var/www/secway
 ```
 
-Create the first admin user:
+### TinyMCE (rich-text editor for signature blocks)
+
+The admin signature-block editor uses TinyMCE, which is **not** bundled in the repository
+(it is excluded via `.gitignore`). Download the last MIT-licensed release once into
+`public/vendor/tinymce`:
+
+```bash
+curl -sL https://registry.npmjs.org/tinymce/-/tinymce-6.8.6.tgz | tar -xz -C /tmp
+mkdir -p public/vendor && rm -rf public/vendor/tinymce
+mv /tmp/package public/vendor/tinymce
+chown -R www-data:www-data public/vendor
+```
+
+> TinyMCE 7+ is GPL/commercial; 6.8.x is the last MIT version and is self-hosted here so no
+> external CDN or API key is involved. If you don't use the signature-block module you can skip
+> this step.
+
+### First admin user
+
+Login is by **username** (not e-mail). Create the first admin — pass the password as
+**plaintext**; the model's `hashed` cast hashes it automatically (do **not** wrap it in
+`bcrypt()`, that would double-hash and lock you out):
 
 ```bash
 php artisan tinker --execute="
-\App\Models\User::create(['name' => 'Admin', 'email' => 'admin@example.org',
-    'password' => bcrypt('<initial password>')]);"
+\App\Models\User::create([
+    'username' => 'Admin',
+    'name'     => 'Administrator',
+    'email'    => 'admin@example.org',
+    'password' => '<initial password, min. 10 chars>',
+]);"
 ```
+
+Afterwards change the password anytime under **Admin → Konto**.
 
 ## 4. nginx + TLS
 
-Standard Laravel vhost pointing at `/var/www/secway/public`, then:
+Standard Laravel vhost pointing at `/var/www/secway/public` — a ready-made template is in
+[`deploy/nginx-secway.conf.example`](../deploy/nginx-secway.conf.example):
 
 ```bash
+cp deploy/nginx-secway.conf.example /etc/nginx/sites-available/secway   # edit server_name
+ln -s ../sites-available/secway /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
 certbot --nginx -d secway.example.org
 ```
 
@@ -138,7 +179,49 @@ Mail the gateway sends itself (notifications, re-injected mail via `sendmail`) e
    - No loop is possible: after decryption/verification the gateway re-injects the mail with a
      normal Content-Type, so the rule no longer matches on the second pass.
 
-## 7. Cron & operations scripts
+## 7. Signature blocks (optional) — Entra app + Microsoft Graph
+
+Skip this section entirely if you don't want server-side e-mail signatures. The module adds a
+footer ("signature block") to outbound mail, filled with the sender's attributes from Entra ID
+(Microsoft 365). It is disabled by default (Admin → Signaturblöcke → toggle).
+
+**1. Register an app** in [entra.microsoft.com](https://entra.microsoft.com) → *App registrations*
+→ *New registration*: single tenant, no redirect URI.
+
+**2. API permissions** → *Add a permission* → *Microsoft Graph* → **Application permissions**,
+then **Grant admin consent**:
+
+| Permission | Needed for |
+|---|---|
+| `User.Read.All` | reading user attributes for placeholders (**required** for the module) |
+| `GroupMember.Read.All` | only if you filter the sync or rules by Entra groups |
+| `Mail.ReadWrite` | only for the "update Sent Items" feature (replaces the sent copy with the signed version) |
+
+**3. Client secret** → *Certificates & secrets* → *New client secret* (note the expiry date).
+
+**4. Put the three values in `.env`** and re-cache:
+
+```
+GRAPH_TENANT_ID=...
+GRAPH_CLIENT_ID=...
+GRAPH_CLIENT_SECRET=...
+```
+
+```bash
+php artisan config:cache
+php artisan entra:sync        # first user import; afterwards hourly via the scheduler
+```
+
+**5. In the admin UI** (Admin → Benutzer) choose which accounts to sync (all, or specific Entra
+groups, e.g. a dynamic group scoped to your user OU), then create signature blocks under
+Admin → Signaturblöcke and switch the module on.
+
+No extra Exchange rule is required: signature blocks are applied to outbound mail that already
+flows through the gateway via the "route through SecWay" rule from section 6. (Signing *internal*
+mail — where sender and recipient are both internal — would need the routing rule widened to
+internal recipients; that is on the roadmap and not covered here.)
+
+## 8. Cron & operations scripts
 
 ```bash
 cp ops/mgw-health.sh ops/mgw-backup.sh ops/mgw-queue-helper.sh /usr/local/sbin/
@@ -147,16 +230,17 @@ cp ops/secway.conf.example /etc/secway.conf   # edit values!
 cp ops/cron.example /etc/cron.d/secway        # edit APP_DIR!
 ```
 
-This gives you: the Laravel scheduler (delayed password mails, reminders, expiry purge),
-a 5-minute health check with mail alerting and a mail-loop emergency brake, nightly backups
-and the privileged helper that executes queue deletions requested from the admin UI.
+This gives you: the Laravel scheduler (delayed password mails, reminders, expiry purge, hourly
+Entra sync and the per-minute Sent-Items updater when enabled), a 5-minute health check with
+mail alerting and a mail-loop emergency brake, nightly backups and the privileged helper that
+executes queue deletions requested from the admin UI.
 
-## 8. fail2ban
+## 9. fail2ban
 
 Enable the shipped `sshd` and `postfix` jails with the systemd/journald backend in
 `/etc/fail2ban/jail.local`.
 
-## 9. Certificates
+## 10. Certificates
 
 - **Own certificates** (your domains/addresses, with private key): Admin → Zertifikate →
   upload PFX/PEM, type *Eigenes*. Used for inbound decryption and outbound signatures.
@@ -164,7 +248,7 @@ Enable the shipped `sshd` and `postfix` jails with the systemd/journald backend 
   gateway **harvest** them from signed inbound mail.
 - Bulk import: `php artisan smime:import <dir>`.
 
-## 10. Smoke test
+## 11. Smoke test
 
 ```bash
 # Portal flow: tagged mail to a recipient without certificate

@@ -1,0 +1,30 @@
+# SecWay nginx vhost — copy to /etc/nginx/sites-available/secway, adjust the
+# server_name, then: ln -s ../sites-available/secway /etc/nginx/sites-enabled/
+# and run certbot (it rewrites this file to add the TLS listener + redirect):
+#   certbot --nginx -d secway.example.org
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name secway.example.org;
+
+    root /var/www/secway/public;
+    index index.php;
+
+    charset utf-8;
+    client_max_body_size 60M;          # matches Postfix message_size_limit + headroom
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+    }
+
+    location ~ /\.(?!well-known).* { deny all; }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+}

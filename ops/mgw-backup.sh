@@ -29,7 +29,8 @@ if ! tar --warning=none -czf "$BACKUP_DIR/files-$DATE.tar.gz" \
     /usr/local/sbin/mgw-backup.sh \
     /usr/local/sbin/mgw-health.sh \
     /usr/local/sbin/mgw-queue-helper.sh \
-    "$APP_DIR/storage/app/messages" 2>/dev/null; then
+    "$APP_DIR/storage/app/messages" \
+    "$APP_DIR/storage/app/signatures" 2>/dev/null; then
     FAIL+="Datei-Backup fehlgeschlagen"$'\n'
 fi
 
