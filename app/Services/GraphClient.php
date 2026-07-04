@@ -8,8 +8,9 @@ use RuntimeException;
 
 /**
  * Minimaler Microsoft-Graph-Client (Client-Credentials-Flow).
- * Berechtigungen: User.Read.All, für Gruppenfilter zusätzlich GroupMember.Read.All
- * (jeweils Application). Zugangsdaten in config/mailgateway.php (graph.*).
+ * Berechtigungen: User.Read.All, für Gruppenfilter/-regeln zusätzlich
+ * GroupMember.Read.All (jeweils Application).
+ * Zugangsdaten in config/mailgateway.php (graph.*).
  */
 class GraphClient
 {
@@ -42,6 +43,25 @@ class GraphClient
         return $this->fetchAll(
             'https://graph.microsoft.com/v1.0/groups/'.$groupId
             .'/transitiveMembers/microsoft.graph.user?$select='.self::USER_FIELDS.'&$top=999'
+        );
+    }
+
+    /** Nur die Objekt-IDs der Benutzer-Mitglieder einer Gruppe (für Regel-Gruppen). */
+    public function groupMemberIds(string $groupId): array
+    {
+        $items = $this->fetchAll(
+            'https://graph.microsoft.com/v1.0/groups/'.$groupId
+            .'/transitiveMembers/microsoft.graph.user?$select=id&$top=999'
+        );
+
+        return array_column($items, 'id');
+    }
+
+    /** Alle Gruppen des Tenants (id + Anzeigename), z.B. für Auswahl-Dropdowns. */
+    public function groups(): array
+    {
+        return $this->fetchAll(
+            'https://graph.microsoft.com/v1.0/groups?$select=id,displayName&$top=999'
         );
     }
 

@@ -16,28 +16,35 @@
             <button class="btn" style="margin-left:auto;" wire:click="create">Neue Vorlage</button>
         </div>
         <table style="margin-top:12px;">
-            <thead><tr><th>Name</th><th>Status</th><th>Vorhandene Signatur</th><th>Geändert</th><th></th></tr></thead>
+            <thead><tr><th>Prio</th><th>Name</th><th>Status</th><th>Empfänger</th><th>Absender</th><th>Zeitraum</th><th>Danach</th><th></th></tr></thead>
             <tbody>
             @forelse ($templates as $t)
                 <tr>
+                    <td>{{ $t->priority }}</td>
                     <td><strong>{{ $t->name }}</strong></td>
                     <td>
                         @if ($t->active) <span class="badge ok">aktiv</span>
                         @else <span class="badge off">inaktiv</span>
                         @endif
                     </td>
-                    <td class="muted">{{ $t->existing_mode === 'replace' ? 'ersetzen' : 'überspringen' }}</td>
-                    <td class="muted">{{ $t->updated_at?->format('d.m.Y H:i') }}</td>
+                    <td class="muted">{{ $t->directionLabel() }}</td>
+                    <td class="muted">{{ $t->senderLabel() }}</td>
+                    <td class="muted">{{ $t->periodLabel() }}</td>
+                    <td class="muted">{{ $t->continue_processing ? 'weitere anwenden' : 'stopp' }}</td>
                     <td style="text-align:right; white-space:nowrap;">
                         <button class="btn small ghost" wire:click="edit({{ $t->id }})">Bearbeiten</button>
                         <button class="btn small danger" wire:click="delete({{ $t->id }})" wire:confirm="Vorlage „{{ $t->name }}" wirklich löschen?">Löschen</button>
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="muted">Noch keine Vorlage — mit „Neue Vorlage" starten. Signaturen werden erst angehängt, wenn eine Vorlage aktiv ist und das Signatur-Modul eingeschaltet wird (kommt in einer späteren Ausbaustufe).</td></tr>
+                <tr><td colspan="8" class="muted">Noch keine Vorlage — mit „Neue Vorlage" starten. Signaturen werden erst angehängt, wenn eine Vorlage aktiv ist und das Signatur-Modul eingeschaltet wird (kommt in einer späteren Ausbaustufe).</td></tr>
             @endforelse
             </tbody>
         </table>
+        <div class="muted" style="margin-top:8px;">
+            Vorlagen werden nach Priorität geprüft (kleinste zuerst). Die erste passende wird angewandt;
+            weitere folgen nur, wenn bei ihr „weitere anwenden" gesetzt ist.
+        </div>
     </div>
 
     @if ($editId !== null)
@@ -77,7 +84,72 @@
                 @error('text_body')<div class="error">{{ $message }}</div>@enderror
             </div>
 
-            <div style="margin-top:12px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+            <h2 style="margin-top:18px;">Anwendungsregeln</h2>
+            <div class="grid2">
+                <div>
+                    <label>Gilt für Mails an</label>
+                    <select wire:model="direction">
+                        <option value="both">Alle Empfänger (intern + extern)</option>
+                        <option value="external">Nur externe Empfänger</option>
+                        <option value="internal">Nur interne Empfänger</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Absender</label>
+                    <select wire:model.live="sender_mode">
+                        <option value="all">Alle Benutzer</option>
+                        <option value="users">Bestimmte Adressen</option>
+                        <option value="group">Entra-Gruppe</option>
+                    </select>
+                </div>
+            </div>
+            @if ($sender_mode === 'users')
+                <div style="margin-top:10px;">
+                    <label>Absenderadressen (kommagetrennt)</label>
+                    <textarea wire:model="sender_users" rows="2" style="width:100%;" placeholder="a.muster@straphael.de, b.muster@straphael.de"></textarea>
+                    @error('sender_users')<div class="error">{{ $message }}</div>@enderror
+                </div>
+            @elseif ($sender_mode === 'group')
+                <div style="margin-top:10px;">
+                    <label>Gruppe</label>
+                    <select wire:model="sender_group_id">
+                        <option value="">— bitte wählen —</option>
+                        @foreach ($this->groupOptions as $gid => $gname)
+                            <option value="{{ $gid }}">{{ $gname }}</option>
+                        @endforeach
+                    </select>
+                    @error('sender_group_id')<div class="error">{{ $message }}</div>@enderror
+                    <div class="muted" style="margin-top:4px;">
+                        Mitgliedschaften werden beim stündlichen Entra-Sync aufgelöst — nach Gruppenänderungen
+                        ggf. auf der Benutzer-Seite manuell synchronisieren.
+                    </div>
+                </div>
+            @endif
+            <div class="grid2" style="margin-top:10px;">
+                <div>
+                    <label>Gültig von (leer = sofort)</label>
+                    <input type="date" wire:model="valid_from">
+                    @error('valid_from')<div class="error">{{ $message }}</div>@enderror
+                </div>
+                <div>
+                    <label>Gültig bis (leer = dauerhaft)</label>
+                    <input type="date" wire:model="valid_until">
+                    @error('valid_until')<div class="error">{{ $message }}</div>@enderror
+                </div>
+                <div>
+                    <label>Priorität (kleinere Zahl = zuerst geprüft)</label>
+                    <input type="number" wire:model="priority" min="1" max="999">
+                    @error('priority')<div class="error">{{ $message }}</div>@enderror
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                    <label style="display:flex; gap:8px; align-items:center; margin:0;">
+                        <input type="checkbox" wire:model="continue_processing" style="width:auto;">
+                        Nach dieser Vorlage weitere passende Vorlagen anwenden
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-top:16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
                 <label style="display:flex; gap:8px; align-items:center; margin:0;">
                     <input type="checkbox" wire:model="active" style="width:auto;"> Vorlage aktiv
                 </label>

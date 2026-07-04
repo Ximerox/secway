@@ -4,9 +4,11 @@ namespace App\Console\Commands;
 
 use App\Models\EntraUser;
 use App\Models\Setting;
+use App\Models\SignatureTemplate;
 use App\Services\GraphClient;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class EntraSync extends Command
@@ -27,15 +29,18 @@ class EntraSync extends Command
         $enabledOnly = Setting::getBool('entra_sync_enabled_only', true);
         $excludes = preg_split('/[\s,]+/', (string) Setting::get('entra_sync_exclude', 'HealthMailbox*, DiscoverySearchMailbox*'), -1, PREG_SPLIT_NO_EMPTY);
 
+        $memberships = []; // Entra-User-ID => [Gruppen-IDs]
+
         try {
             if ($groupIds !== []) {
                 // Gruppenmodus: Vereinigung der (transitiven) Benutzer-Mitglieder.
                 // Bewusst OHNE accountEnabled-Filter — freigegebene Postfächer sind
-                // technisch deaktivierte Konten; die Gruppen definieren den Umfang.
+                // teils deaktivierte Konten; die Gruppen definieren den Umfang.
                 $all = [];
                 foreach ($groupIds as $gid) {
                     foreach ($graph->groupMembers($gid) as $u) {
                         $all[$u['id']] = $u;
+                        $memberships[$u['id']][] = $gid;
                     }
                 }
                 $all = array_values($all);
@@ -52,6 +57,23 @@ class EntraSync extends Command
             $this->error('Abruf fehlgeschlagen: '.$e->getMessage());
 
             return self::FAILURE;
+        }
+
+        // Gruppen, die in Signatur-Regeln referenziert sind, zusätzlich auflösen,
+        // damit senderMatches() Mitgliedschaften prüfen kann.
+        $ruleGroups = [];
+        if (Schema::hasTable('signature_templates')) {
+            $ruleGroups = SignatureTemplate::whereNotNull('sender_group_id')->distinct()->pluck('sender_group_id')->all();
+        }
+        foreach (array_diff($ruleGroups, $groupIds) as $gid) {
+            try {
+                foreach ($graph->groupMemberIds($gid) as $id) {
+                    $memberships[$id][] = $gid;
+                }
+            } catch (Throwable $e) {
+                Log::warning('entra:sync: Regel-Gruppe '.$gid.' nicht abrufbar: '.$e->getMessage());
+                $this->warn('Regel-Gruppe '.$gid.' nicht abrufbar (Details im Log).');
+            }
         }
 
         $fetched = count($all);
@@ -98,6 +120,7 @@ class EntraSync extends Command
                 'city' => $u['city'] ?? null,
                 'country' => $u['country'] ?? null,
                 'proxy_addresses' => $u['proxyAddresses'] ?? [],
+                'group_ids' => array_values(array_unique($memberships[$u['id']] ?? [])),
                 'account_enabled' => (bool) ($u['accountEnabled'] ?? true),
                 'raw' => $u,
                 'synced_at' => now(),

@@ -10,6 +10,7 @@ class EntraUser extends Model
 
     protected $casts = [
         'proxy_addresses' => 'array',
+        'group_ids' => 'array',
         'raw' => 'array',
         'account_enabled' => 'boolean',
         'synced_at' => 'datetime',

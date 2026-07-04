@@ -37,7 +37,7 @@
     .alert.ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; }
     .alert.err { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
     label { display: block; font-size: 13.5px; font-weight: 600; margin: 12px 0 4px; }
-    input[type=text], input[type=password], select { width: 100%; padding: 9px 12px; font-size: 14.5px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; }
+    input[type=text], input[type=password], input[type=email], input[type=date], input[type=number], select { width: 100%; padding: 9px 12px; font-size: 14.5px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; }
     input[type=file] { font-size: 14px; padding: 6px 0; }
     input:focus, select:focus { outline: 2px solid #1d4e89; border-color: #1d4e89; }
     .btn { padding: 9px 18px; font-size: 14.5px; font-weight: 600; color: #fff; background: #1d4e89; border: 0; border-radius: 8px; cursor: pointer; margin-top: 14px; }
