@@ -130,8 +130,13 @@ Mail the gateway sends itself (notifications, re-injected mail via `sendmail`) e
      outbound connector.
    - **Exception:** header `X-MGW-Notification` contains `yes` (loop protection — the gateway
      marks everything it sends with this header).
-4. For **inbound decryption/harvesting**, add a rule for external S/MIME mail (condition:
-   message type is signed or encrypted) routing through the same connector with the same header.
+4. For **inbound decryption/harvesting**, add a rule for external S/MIME mail routing through
+   the same connector with the same header. Match S/MIME reliably via the Content-Type header
+   (the built-in "message type" condition only accepts one type per condition):
+   - **Conditions:** sender is outside the organization, **and** header `Content-Type` contains
+     any of `application/pkcs7-mime`, `application/x-pkcs7-mime`, `multipart/signed`
+   - No loop is possible: after decryption/verification the gateway re-injects the mail with a
+     normal Content-Type, so the rule no longer matches on the second pass.
 
 ## 7. Cron & operations scripts
 
