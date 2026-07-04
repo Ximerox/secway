@@ -154,4 +154,14 @@ recipients), reply-from-portal for external recipients, optional AES-GCM/OAEP ci
 
 ## License
 
-Private repository — all rights reserved (license to be decided before publication).
+Copyright © 2026 Dietmar Möller
+
+SecWay is free software: you can redistribute it and/or modify it under the terms of the
+**GNU Affero General Public License, version 3 or later** (AGPL-3.0-or-later) as published by
+the Free Software Foundation. It is distributed in the hope that it will be useful, but
+**without any warranty**; without even the implied warranty of merchantability or fitness for
+a particular purpose. See the [LICENSE](LICENSE) file for the full text.
+
+The AGPL is a strong copyleft license: if you modify SecWay and let others use it — including
+**over a network** as a hosted service — you must make your modified source available to those
+users under the same license.
