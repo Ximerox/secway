@@ -68,7 +68,10 @@ class GraphClient
     /** Sucht eine Mail im Ordner „Gesendete Elemente" anhand der Internet-Message-ID. */
     public function findSentItem(string $user, string $internetMessageId): ?array
     {
-        $filter = rawurlencode("internetMessageId eq '".str_replace("'", "''", $internetMessageId)."'");
+        // Graph liefert/erwartet die ID inkl. spitzer Klammern — normalisieren,
+        // egal ob der Aufrufer sie mit oder ohne Klammern übergibt.
+        $imid = '<'.trim($internetMessageId, '<> ').'>';
+        $filter = rawurlencode("internetMessageId eq '".str_replace("'", "''", $imid)."'");
         $resp = Http::withToken($this->token())->timeout(60)->get(
             'https://graph.microsoft.com/v1.0/users/'.rawurlencode($user)
             .'/mailFolders/sentitems/messages?$filter='.$filter.'&$select=id,sentDateTime,internetMessageId'
