@@ -2,8 +2,10 @@
 
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\PortalController;
+use App\Http\Controllers\SignatureImageController;
 use App\Livewire\Admin\Certificates;
 use App\Livewire\Admin\EntraUsers;
+use App\Livewire\Admin\Signatures;
 use App\Livewire\Admin\Log;
 use App\Livewire\Admin\Messages;
 use App\Livewire\Admin\Queue as AdminQueue;
@@ -39,6 +41,8 @@ Route::prefix('admin')->group(function () {
         Route::get('/protokoll', Log::class)->name('admin.log');
         Route::get('/statistik', Stats::class)->name('admin.stats');
         Route::get('/zertifikate', Certificates::class)->name('admin.certs');
+        Route::get('/signaturen', Signatures::class)->name('admin.signatures');
+        Route::get('/sig-img/{image}', [SignatureImageController::class, 'show'])->name('admin.sigimg');
         Route::get('/benutzer', EntraUsers::class)->name('admin.users');
         Route::get('/einstellungen', Settings::class)->name('admin.settings');
     });
