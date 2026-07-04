@@ -139,7 +139,9 @@
     @endif
 
     <script>
-        window.sigWire = @this;
+        // Nur Daten ablegen — Livewire ist zu diesem Zeitpunkt noch nicht geladen,
+        // die Komponenten-Referenz wird deshalb erst beim Klick aufgelöst (sigWire()).
+        window.SIG_WIRE_ID = '{{ $this->getId() }}';
         window.SIG_PLACEHOLDERS = @json(\App\Livewire\Admin\Signatures::PLACEHOLDERS);
     </script>
     <script>
@@ -171,13 +173,16 @@
                 },
             });
         }
+        function sigWire() {
+            return window.Livewire.find(window.SIG_WIRE_ID);
+        }
         async function sigCollect() {
             const ed = window.tinymce && tinymce.get('sig-html-editor');
-            if (ed) { await window.sigWire.set('html', ed.getContent(), false); }
+            if (ed) { await sigWire().set('html', ed.getContent(), false); }
         }
-        async function sigSave() { await sigCollect(); window.sigWire.call('save'); }
-        async function sigPreview() { await sigCollect(); window.sigWire.call('preview'); }
-        async function sigTest() { await sigCollect(); window.sigWire.call('sendTest'); }
+        async function sigSave() { await sigCollect(); sigWire().call('save'); }
+        async function sigPreview() { await sigCollect(); sigWire().call('preview'); }
+        async function sigTest() { await sigCollect(); sigWire().call('sendTest'); }
         function sigInsertImage(url) {
             const ed = window.tinymce && tinymce.get('sig-html-editor');
             if (ed) ed.insertContent('<img src="' + url + '" alt="">');

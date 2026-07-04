@@ -188,12 +188,17 @@ class Signatures extends Component
             'upload.max' => 'Maximal 2 MB — Signaturbilder sollten klein sein, sie hängen an jeder Mail.',
         ]);
 
+        // Metadaten VOR store() lesen — danach ist die temporäre Datei verschoben
+        $name = $this->upload->getClientOriginalName();
+        $mime = $this->upload->getMimeType() ?: 'application/octet-stream';
+        $size = (int) $this->upload->getSize();
+
         $path = $this->upload->store('signatures');
         SignatureImage::create([
-            'original_name' => $this->upload->getClientOriginalName(),
+            'original_name' => $name,
             'path' => $path,
-            'mime' => $this->upload->getMimeType() ?: 'application/octet-stream',
-            'size' => (int) $this->upload->getSize(),
+            'mime' => $mime,
+            'size' => $size,
         ]);
 
         $this->reset('upload');
