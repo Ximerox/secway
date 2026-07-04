@@ -61,9 +61,33 @@ class MailIngest extends Command
             return self::EX_UNAVAILABLE;
         }
 
-        // Bounces (leerer Envelope-Sender kommt von Postfix als MAILER-DAEMON an) still verwerfen
+        // Leerer Envelope-Absender (Postfix liefert "MAILER-DAEMON"): das sind Bounces,
+        // aber auch legitime No-Reply-/Systemmails (Newsletter, Lesebestätigungen).
+        // An interne Empfänger unverändert zustellen — nur nach draußen wäre es
+        // Backscatter und wird (sichtbar protokolliert) verworfen.
         if (! str_contains($sender, '@')) {
-            AuditEvent::log('ingest_dropped_bounce', details: ['queue_id' => $queueId]);
+            $headerBlock = RawMail::split($raw)[0];
+            $details = [
+                'queue_id' => $queueId,
+                'from_header' => mb_substr((string) RawMail::findHeader($headerBlock, 'from'), 0, 200),
+                'subject' => mb_substr((string) RawMail::findHeader($headerBlock, 'subject'), 0, 200),
+            ];
+            $internal = array_values(array_filter($recipients, fn ($r) => InternalDomains::isInternal($r)));
+            $external = array_values(array_diff($recipients, $internal));
+
+            if ($internal !== []) {
+                app(SmimeMailService::class)->passThrough($raw, '', $internal);
+                AuditEvent::log('passed_through', details: array_merge($details, [
+                    'recipients' => $internal,
+                    'note' => 'leerer Envelope-Absender (Bounce/No-Reply) — unverändert zugestellt',
+                ]));
+            }
+            if ($external !== []) {
+                AuditEvent::log('ingest_dropped_bounce', details: array_merge($details, [
+                    'recipients' => $external,
+                    'reason' => 'leerer Absender an externe Empfänger (Backscatter-Schutz)',
+                ]));
+            }
 
             return self::EX_OK;
         }
