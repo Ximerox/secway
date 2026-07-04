@@ -59,10 +59,7 @@ class SignatureMailService
             return $none('Absender nicht im Entra-Cache');
         }
 
-        $direction = collect($recipients)->contains(fn ($r) => ! InternalDomains::isInternal($r))
-            ? 'external' : 'internal';
-
-        $templates = SignatureTemplate::applicable($user, $direction);
+        $templates = SignatureTemplate::applicable($user, $recipients);
         if ($templates->isEmpty()) {
             return $none(); // kein Treffer = kein Protokoll-Rauschen
         }
@@ -153,7 +150,7 @@ class SignatureMailService
         // dann zeigen Clients Text- UND HTML-Teil nacheinander an.)
         $newImages = [];
         foreach ($images as $cid => $img) {
-            if (! str_contains($out, '<'.$cid.'>') && is_readable($img['path'])) {
+            if (! str_contains($out, '<'.$cid.'>') && $this->imageBytes($img) !== null) {
                 $newImages[$cid] = $img;
             }
         }
@@ -223,14 +220,24 @@ class SignatureMailService
 
     protected function imagePartMime(string $boundary, string $cid, array $img): string
     {
-        $name = basename($img['path']);
+        $name = isset($img['path']) ? basename($img['path']) : $cid.'.png';
 
         return '--'.$boundary."\r\n"
             .'Content-Type: '.$img['mime'].'; name="'.$name.'"'."\r\n"
             ."Content-Transfer-Encoding: base64\r\n"
             .'Content-Disposition: inline; filename="'.$name.'"'."\r\n"
             .'Content-ID: <'.$cid.'>'."\r\n\r\n"
-            .chunk_split(base64_encode((string) file_get_contents($img['path'])), 76, "\r\n");
+            .chunk_split(base64_encode((string) $this->imageBytes($img)), 76, "\r\n");
+    }
+
+    /** Bilddaten aus dem images-Eintrag: entweder inline (bytes) oder aus Datei (path). */
+    protected function imageBytes(array $img): ?string
+    {
+        if (isset($img['bytes'])) {
+            return $img['bytes'];
+        }
+
+        return isset($img['path']) && is_readable($img['path']) ? (string) file_get_contents($img['path']) : null;
     }
 
     /** Mails, die grundsätzlich nicht angefasst werden. */

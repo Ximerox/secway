@@ -7,6 +7,7 @@ use App\Models\AuditEvent;
 use App\Models\EntraUser;
 use App\Models\Setting;
 use App\Models\SignatureImage;
+use App\Models\SignatureQrCode;
 use App\Models\SignatureTemplate;
 use App\Services\GraphClient;
 use App\Services\SignatureRenderer;
@@ -65,13 +66,30 @@ class Signatures extends Component
 
     public string $sender_group_id = '';
 
+    public string $sender_exclude = '';
+
+    public string $recipient_include = '';
+
+    public string $recipient_exclude = '';
+
     public string $valid_from = '';
 
     public string $valid_until = '';
 
-    public bool $continue_processing = false;
+    public string $on_applied = 'stop';
+
+    public string $on_not_applied = 'continue';
 
     public $upload = null;
+
+    // QR-Code-Verwaltung
+    public ?int $qrEditId = null;
+
+    public string $qr_label = '';
+
+    public string $qr_text = '';
+
+    public int $qr_size = 150;
 
     public string $preview_user = '';
 
@@ -140,9 +158,13 @@ class Signatures extends Component
         $this->sender_mode = 'all';
         $this->sender_users = '';
         $this->sender_group_id = '';
+        $this->sender_exclude = '';
+        $this->recipient_include = '';
+        $this->recipient_exclude = '';
         $this->valid_from = '';
         $this->valid_until = '';
-        $this->continue_processing = false;
+        $this->on_applied = 'stop';
+        $this->on_not_applied = 'continue';
         $this->previewHtml = '';
         $this->dispatch('sig-editor', html: $this->html);
     }
@@ -161,9 +183,13 @@ class Signatures extends Component
         $this->sender_mode = $t->sender_mode;
         $this->sender_users = (string) $t->sender_users;
         $this->sender_group_id = (string) $t->sender_group_id;
+        $this->sender_exclude = (string) $t->sender_exclude;
+        $this->recipient_include = (string) $t->recipient_include;
+        $this->recipient_exclude = (string) $t->recipient_exclude;
         $this->valid_from = $t->valid_from?->format('Y-m-d') ?? '';
         $this->valid_until = $t->valid_until?->format('Y-m-d') ?? '';
-        $this->continue_processing = $t->continue_processing;
+        $this->on_applied = $t->on_applied;
+        $this->on_not_applied = $t->on_not_applied;
         $this->previewHtml = '';
         $this->dispatch('sig-editor', html: $this->html);
     }
@@ -185,8 +211,13 @@ class Signatures extends Component
             'sender_mode' => 'in:all,users,group',
             'sender_users' => 'required_if:sender_mode,users|nullable|string|max:5000',
             'sender_group_id' => 'required_if:sender_mode,group|nullable|uuid',
+            'sender_exclude' => 'nullable|string|max:5000',
+            'recipient_include' => 'nullable|string|max:5000',
+            'recipient_exclude' => 'nullable|string|max:5000',
             'valid_from' => 'nullable|date',
             'valid_until' => 'nullable|date|after_or_equal:valid_from',
+            'on_applied' => 'in:continue,stop',
+            'on_not_applied' => 'in:continue,stop',
         ], [
             'name.required' => 'Bitte einen Namen für die Vorlage vergeben.',
             'html.required' => 'Die Vorlage ist leer.',
@@ -214,9 +245,13 @@ class Signatures extends Component
             'sender_users' => $this->sender_mode === 'users' ? trim($this->sender_users) : null,
             'sender_group_id' => $this->sender_mode === 'group' ? $this->sender_group_id : null,
             'sender_group_name' => $groupName,
+            'sender_exclude' => trim($this->sender_exclude) ?: null,
+            'recipient_include' => trim($this->recipient_include) ?: null,
+            'recipient_exclude' => trim($this->recipient_exclude) ?: null,
             'valid_from' => $this->valid_from ?: null,
             'valid_until' => $this->valid_until ?: null,
-            'continue_processing' => $this->continue_processing,
+            'on_applied' => $this->on_applied,
+            'on_not_applied' => $this->on_not_applied,
         ])->save();
 
         $this->editId = $t->id;
@@ -280,7 +315,7 @@ class Signatures extends Component
         }
 
         $t = new SignatureTemplate(['html' => $this->html, 'text_body' => $this->text_body]);
-        $this->previewHtml = $renderer->renderHtml($t, $user);
+        $this->previewHtml = $renderer->forPreview($t, $user);
     }
 
     public function sendTest(SignatureRenderer $renderer): void
@@ -339,13 +374,86 @@ class Signatures extends Component
         session()->flash('ok', 'Bild gelöscht. Achtung: Vorlagen, die es noch referenzieren, zeigen es nicht mehr an.');
     }
 
+    // --- QR-Codes ---------------------------------------------------------
+
+    public function newQr(): void
+    {
+        $this->resetValidation();
+        $this->qrEditId = 0;
+        $this->qr_label = '';
+        $this->qr_text = self::defaultVCard();
+        $this->qr_size = 150;
+    }
+
+    public function editQr(int $id): void
+    {
+        $qr = SignatureQrCode::findOrFail($id);
+        $this->resetValidation();
+        $this->qrEditId = $qr->id;
+        $this->qr_label = $qr->label;
+        $this->qr_text = $qr->text;
+        $this->qr_size = (int) $qr->size;
+    }
+
+    public function saveQr(): void
+    {
+        $this->validate([
+            'qr_label' => 'required|string|min:2|max:100',
+            'qr_text' => 'required|string|max:2000',
+            'qr_size' => 'required|integer|min:80|max:400',
+        ], [
+            'qr_label.required' => 'Bitte eine Bezeichnung vergeben.',
+            'qr_text.required' => 'Der QR-Inhalt darf nicht leer sein.',
+        ]);
+
+        $qr = $this->qrEditId ? SignatureQrCode::find($this->qrEditId) : null;
+        $qr ??= new SignatureQrCode;
+        $qr->fill([
+            'label' => trim($this->qr_label),
+            'text' => $this->qr_text,
+            'size' => $this->qr_size,
+        ])->save();
+
+        $this->qrEditId = null;
+        session()->flash('ok', 'QR-Code „'.$qr->label.'" gespeichert — über „In Editor einfügen" in die Vorlage übernehmen.');
+    }
+
+    public function deleteQr(int $id): void
+    {
+        $qr = SignatureQrCode::findOrFail($id);
+        $qr->delete();
+        session()->flash('ok', 'QR-Code gelöscht. Vorlagen, die ihn noch referenzieren, zeigen ihn nicht mehr an.');
+    }
+
+    public function cancelQr(): void
+    {
+        $this->qrEditId = null;
+    }
+
     public function render()
     {
         return view('livewire.admin.signatures', [
             'templates' => SignatureTemplate::orderBy('priority')->orderBy('name')->get(),
             'images' => SignatureImage::orderByDesc('id')->get(),
+            'qrCodes' => SignatureQrCode::orderByDesc('id')->get(),
             'previewUsers' => EntraUser::orderBy('display_name')->get(['display_name', 'mail']),
         ]);
+    }
+
+    protected static function defaultVCard(): string
+    {
+        return <<<'VCARD'
+BEGIN:VCARD
+VERSION:3.0
+N:{{nachname}};{{vorname}}
+FN:{{vorname}} {{nachname}}
+TITLE:{{position}}
+ORG:{{firma}}
+TEL;TYPE=WORK,VOICE:{{telefon}}
+TEL;TYPE=CELL:{{mobil}}
+EMAIL:{{email}}
+END:VCARD
+VCARD;
     }
 
     protected static function defaultHtml(): string

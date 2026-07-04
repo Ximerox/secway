@@ -40,7 +40,7 @@
             <button class="btn" style="margin-left:auto;" wire:click="create">Neue Vorlage</button>
         </div>
         <table style="margin-top:12px;">
-            <thead><tr><th>Prio</th><th>Name</th><th>Status</th><th>Empfänger</th><th>Absender</th><th>Zeitraum</th><th>Danach</th><th></th></tr></thead>
+            <thead><tr><th>Prio</th><th>Name</th><th>Status</th><th>Absender</th><th>Empfänger</th><th>Zeitraum</th><th></th></tr></thead>
             <tbody>
             @forelse ($templates as $t)
                 <tr>
@@ -51,23 +51,22 @@
                         @else <span class="badge off">inaktiv</span>
                         @endif
                     </td>
-                    <td class="muted">{{ $t->directionLabel() }}</td>
                     <td class="muted">{{ $t->senderLabel() }}</td>
+                    <td class="muted">{{ $t->recipientLabel() }}</td>
                     <td class="muted">{{ $t->periodLabel() }}</td>
-                    <td class="muted">{{ $t->continue_processing ? 'weitere anwenden' : 'stopp' }}</td>
                     <td style="text-align:right; white-space:nowrap;">
                         <button class="btn small ghost" wire:click="edit({{ $t->id }})">Bearbeiten</button>
                         <button class="btn small danger" wire:click="delete({{ $t->id }})" wire:confirm="Vorlage „{{ $t->name }}" wirklich löschen?">Löschen</button>
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="8" class="muted">Noch keine Vorlage — mit „Neue Vorlage" starten. Signaturen werden erst angehängt, wenn eine Vorlage aktiv ist und das Signatur-Modul eingeschaltet wird (kommt in einer späteren Ausbaustufe).</td></tr>
+                <tr><td colspan="7" class="muted">Noch keine Vorlage — mit „Neue Vorlage" starten. Signaturen werden erst angehängt, wenn eine Vorlage aktiv ist und das Signatur-Modul oben eingeschaltet ist.</td></tr>
             @endforelse
             </tbody>
         </table>
         <div class="muted" style="margin-top:8px;">
-            Vorlagen werden nach Priorität geprüft (kleinste zuerst). Die erste passende wird angewandt;
-            weitere folgen nur, wenn bei ihr „weitere anwenden" gesetzt ist.
+            Vorlagen werden nach Priorität geprüft (kleinste zuerst). Ob nach einer Vorlage weitere geprüft
+            werden, steuert die „Weiterverarbeitung" je Vorlage.
         </div>
     </div>
 
@@ -122,8 +121,8 @@
             </div>
             @if ($sender_mode === 'users')
                 <div style="margin-top:10px;">
-                    <label>Absenderadressen (kommagetrennt)</label>
-                    <textarea wire:model="sender_users" rows="2" style="width:100%;" placeholder="vorname.nachname@example.org, weitere@example.org"></textarea>
+                    <label>Absenderadressen (kommagetrennt; ganze Domains als @domain.de)</label>
+                    <textarea wire:model="sender_users" rows="2" style="width:100%;" placeholder="vorname.nachname@example.org, @example.org"></textarea>
                     @error('sender_users')<div class="error">{{ $message }}</div>@enderror
                 </div>
             @elseif ($sender_mode === 'group')
@@ -142,6 +141,25 @@
                     </div>
                 </div>
             @endif
+            <div style="margin-top:10px;">
+                <label>Absender-Ausnahmen (diese Absender NIE — kommagetrennt, Adressen oder @domain.de)</label>
+                <textarea wire:model="sender_exclude" rows="2" style="width:100%;" placeholder="chef@example.org, @extern-dienstleister.de"></textarea>
+                @error('sender_exclude')<div class="error">{{ $message }}</div>@enderror
+            </div>
+
+            <div class="grid2" style="margin-top:10px;">
+                <div>
+                    <label>Empfänger-Einschränkung (leer = alle passenden; Adressen oder @domain.de)</label>
+                    <textarea wire:model="recipient_include" rows="2" style="width:100%;" placeholder="@partner.de, kunde@example.org"></textarea>
+                    @error('recipient_include')<div class="error">{{ $message }}</div>@enderror
+                </div>
+                <div>
+                    <label>Empfänger-Ausnahmen (an diese Empfänger NIE)</label>
+                    <textarea wire:model="recipient_exclude" rows="2" style="width:100%;" placeholder="@no-signature.de"></textarea>
+                    @error('recipient_exclude')<div class="error">{{ $message }}</div>@enderror
+                </div>
+            </div>
+
             <div class="grid2" style="margin-top:10px;">
                 <div>
                     <label>Gültig von (leer = sofort)</label>
@@ -158,11 +176,23 @@
                     <input type="number" wire:model="priority" min="1" max="999">
                     @error('priority')<div class="error">{{ $message }}</div>@enderror
                 </div>
-                <div style="display:flex; align-items:flex-end;">
-                    <label style="display:flex; gap:8px; align-items:center; margin:0;">
-                        <input type="checkbox" wire:model="continue_processing" style="width:auto;">
-                        Nach dieser Vorlage weitere passende Vorlagen anwenden
-                    </label>
+            </div>
+
+            <h2 style="margin-top:18px;">Weiterverarbeitung</h2>
+            <div class="grid2">
+                <div>
+                    <label>Wenn diese Vorlage <strong>angewandt</strong> wird</label>
+                    <select wire:model="on_applied">
+                        <option value="stop">Danach keine weiteren Vorlagen mehr</option>
+                        <option value="continue">Weitere passende Vorlagen ebenfalls anwenden</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Wenn diese Vorlage <strong>nicht</strong> angewandt wird</label>
+                    <select wire:model="on_not_applied">
+                        <option value="continue">Nächste Vorlage prüfen</option>
+                        <option value="stop">Danach keine weiteren Vorlagen mehr prüfen</option>
+                    </select>
                 </div>
             </div>
 
@@ -225,6 +255,63 @@
                 </table>
             @endif
         </div>
+
+        <div class="card">
+            <div style="display:flex; align-items:center;">
+                <h2 style="margin:0;">QR-Codes (z.B. vCard zum Abscannen)</h2>
+                <button type="button" class="btn" style="margin-left:auto;" wire:click="newQr">Neuer QR-Code</button>
+            </div>
+            <div class="muted" style="margin-top:6px;">
+                Der QR-Inhalt darf Platzhalter enthalten und wird pro Absender erzeugt und eingebettet.
+                In der Vorlagen-Vorschau erscheint er mit den Daten des gewählten Benutzers.
+            </div>
+
+            @if ($qrEditId !== null)
+                <div style="border:1px solid #e5e7eb; border-radius:8px; padding:12px; margin-top:12px;">
+                    <div class="grid2">
+                        <div>
+                            <label>Bezeichnung</label>
+                            <input type="text" wire:model="qr_label" placeholder="z.B. vCard Kontaktdaten">
+                            @error('qr_label')<div class="error">{{ $message }}</div>@enderror
+                        </div>
+                        <div>
+                            <label>Größe (px)</label>
+                            <input type="number" wire:model="qr_size" min="80" max="400">
+                            @error('qr_size')<div class="error">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <label>Inhalt (Platzhalter erlaubt)</label>
+                        <textarea wire:model="qr_text" rows="8" style="width:100%; font-family:monospace;"></textarea>
+                        @error('qr_text')<div class="error">{{ $message }}</div>@enderror
+                    </div>
+                    <div style="margin-top:10px; display:flex; gap:10px;">
+                        <button type="button" class="btn" wire:click="saveQr">QR-Code speichern</button>
+                        <button type="button" class="btn ghost" wire:click="cancelQr">Abbrechen</button>
+                    </div>
+                </div>
+            @endif
+
+            @if ($qrCodes->isNotEmpty())
+                <table style="margin-top:12px;">
+                    <thead><tr><th>Vorschau</th><th>Bezeichnung</th><th>Größe</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach ($qrCodes as $qr)
+                        <tr>
+                            <td><img src="{{ route('admin.sigqr', $qr) }}" alt="" style="height:44px; width:44px;"></td>
+                            <td><strong>{{ $qr->label }}</strong></td>
+                            <td class="muted">{{ $qr->size }} px</td>
+                            <td style="text-align:right; white-space:nowrap;">
+                                <button type="button" class="btn small ghost" onclick="sigInsertImage('{{ route('admin.sigqr', $qr) }}')">In Editor einfügen</button>
+                                <button type="button" class="btn small ghost" wire:click="editQr({{ $qr->id }})">Bearbeiten</button>
+                                <button class="btn small danger" wire:click="deleteQr({{ $qr->id }})" wire:confirm="QR-Code „{{ $qr->label }}" löschen?">Löschen</button>
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            @endif
+        </div>
     @endif
 
     <script>
@@ -244,7 +331,7 @@
             tinymce.init({
                 selector: '#sig-html-editor',
                 plugins: 'table image link code lists',
-                toolbar: 'undo redo | bold italic underline forecolor fontsize | alignleft aligncenter | bullist numlist | table image link | platzhalter | code',
+                toolbar: 'undo redo | fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | bullist numlist | table image link | platzhalter | code',
                 menubar: false,
                 height: 340,
                 convert_urls: false,

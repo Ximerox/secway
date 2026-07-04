@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\InternalDomains;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
@@ -11,35 +12,35 @@ class SignatureTemplate extends Model
 
     protected $casts = [
         'active' => 'boolean',
-        'continue_processing' => 'boolean',
         'valid_from' => 'date',
         'valid_until' => 'date',
     ];
 
     /**
-     * Alle Vorlagen, die auf einen Absender/eine Richtung anzuwenden sind —
-     * nach Priorität, abgeschnitten nach der ersten Vorlage ohne
-     * continue_processing. $direction: 'external' | 'internal'.
+     * Alle Vorlagen, die auf Absender + Empfänger anzuwenden sind — nach
+     * Priorität. Pro Vorlage steuert on_applied/on_not_applied, ob danach
+     * weitere Vorlagen geprüft werden.
      *
+     * @param  array<int, string>  $recipients
      * @return Collection<int, self>
      */
-    public static function applicable(EntraUser $sender, string $direction): Collection
+    public static function applicable(EntraUser $sender, array $recipients): Collection
     {
         $today = now()->toDateString();
-
-        $candidates = self::where('active', true)
-            ->where(fn ($q) => $q->where('direction', 'both')->orWhere('direction', $direction))
-            ->where(fn ($q) => $q->whereNull('valid_from')->orWhereDate('valid_from', '<=', $today))
-            ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $today))
-            ->orderBy('priority')->orderBy('id')
-            ->get()
-            ->filter(fn (self $t) => $t->senderMatches($sender))
-            ->values();
-
         $result = collect();
-        foreach ($candidates as $t) {
-            $result->push($t);
-            if (! $t->continue_processing) {
+
+        foreach (self::where('active', true)->orderBy('priority')->orderBy('id')->get() as $t) {
+            $inDate = (! $t->valid_from || $t->valid_from->toDateString() <= $today)
+                && (! $t->valid_until || $t->valid_until->toDateString() >= $today);
+
+            $matches = $inDate && $t->senderMatches($sender) && $t->recipientsMatch($recipients);
+
+            if ($matches) {
+                $result->push($t);
+                if ($t->on_applied === 'stop') {
+                    break;
+                }
+            } elseif ($t->on_not_applied === 'stop') {
                 break;
             }
         }
@@ -49,20 +50,80 @@ class SignatureTemplate extends Model
 
     public function senderMatches(EntraUser $user): bool
     {
+        // Ausnahmen haben Vorrang
+        if ($this->matchesAddressList($this->sender_exclude, $user)) {
+            return false;
+        }
+
         return match ($this->sender_mode) {
-            'users' => $this->senderListContains($user),
-            'group' => $this->sender_group_id !== null
-                && in_array($this->sender_group_id, $user->group_ids ?? [], true),
+            'users' => $this->matchesAddressList($this->sender_users, $user),
+            'group' => $this->sender_group_id !== null && in_array($this->sender_group_id, $user->group_ids ?? [], true),
             default => true,
         };
     }
 
-    protected function senderListContains(EntraUser $user): bool
+    /** @param  array<int, string>  $recipients */
+    public function recipientsMatch(array $recipients): bool
     {
-        $list = array_map('strtolower', preg_split('/[\s,;]+/', (string) $this->sender_users, -1, PREG_SPLIT_NO_EMPTY));
+        $eligible = array_filter($recipients, fn ($r) => match ($this->direction) {
+            'external' => ! InternalDomains::isInternal($r),
+            'internal' => InternalDomains::isInternal($r),
+            default => true,
+        });
 
-        return in_array(strtolower((string) $user->mail), $list, true)
-            || in_array(strtolower((string) $user->upn), $list, true);
+        $include = self::parseList($this->recipient_include);
+        if ($include !== []) {
+            $eligible = array_filter($eligible, fn ($r) => $this->addressOrDomainIn($r, $include));
+        }
+
+        $exclude = self::parseList($this->recipient_exclude);
+        if ($exclude !== []) {
+            $eligible = array_filter($eligible, fn ($r) => ! $this->addressOrDomainIn($r, $exclude));
+        }
+
+        return count($eligible) > 0;
+    }
+
+    /** Prüft mail/UPN des Benutzers gegen eine Adress-/Domainliste. */
+    protected function matchesAddressList(?string $list, EntraUser $user): bool
+    {
+        $items = self::parseList($list);
+        if ($items === []) {
+            return false;
+        }
+        foreach ([strtolower((string) $user->mail), strtolower((string) $user->upn)] as $addr) {
+            if ($addr !== '' && $this->addressOrDomainIn($addr, $items)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** true, wenn die Adresse exakt oder über ihre Domain in der Liste steht. */
+    protected function addressOrDomainIn(string $email, array $list): bool
+    {
+        $email = strtolower($email);
+        $domain = str_contains($email, '@') ? substr($email, strrpos($email, '@') + 1) : '';
+        foreach ($list as $item) {
+            if ($item === $email) {
+                return true;
+            }
+            if ($domain !== '' && ($item === '@'.$domain || $item === $domain)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Zerlegt eine komma-/whitespace-getrennte Adressliste (kleingeschrieben). */
+    public static function parseList(?string $s): array
+    {
+        return array_values(array_filter(array_map(
+            fn ($x) => strtolower(trim($x)),
+            preg_split('/[\s,;]+/', (string) $s, -1, PREG_SPLIT_NO_EMPTY)
+        )));
     }
 
     public function directionLabel(): string
@@ -76,11 +137,26 @@ class SignatureTemplate extends Model
 
     public function senderLabel(): string
     {
-        return match ($this->sender_mode) {
+        $base = match ($this->sender_mode) {
             'users' => 'bestimmte Adressen',
             'group' => 'Gruppe: '.($this->sender_group_name ?: $this->sender_group_id),
             default => 'alle Benutzer',
         };
+
+        return trim((string) $this->sender_exclude) !== '' ? $base.' (mit Ausnahmen)' : $base;
+    }
+
+    public function recipientLabel(): string
+    {
+        $base = $this->directionLabel();
+        if (trim((string) $this->recipient_include) !== '') {
+            $base .= ', nur bestimmte';
+        }
+        if (trim((string) $this->recipient_exclude) !== '') {
+            $base .= ' (mit Ausnahmen)';
+        }
+
+        return $base;
     }
 
     public function periodLabel(): string

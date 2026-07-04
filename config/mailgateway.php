@@ -33,11 +33,16 @@ return [
     'ingest_secret' => env('MGW_INGEST_SECRET'),
 
     // Microsoft Graph (Entra ID) für das Signatur-Modul: Client-Credentials-Flow,
-    // Application-Berechtigung User.Read.All. Sync via `php artisan entra:sync`.
+    // Application-Berechtigung User.Read.All (+ GroupMember.Read.All für Gruppen,
+    // Mail.ReadWrite für Postausgang-Aktualisierung). Sync via `php artisan entra:sync`.
     'graph' => [
         'tenant_id' => env('GRAPH_TENANT_ID'),
         'client_id' => env('GRAPH_CLIENT_ID'),
         'client_secret' => env('GRAPH_CLIENT_SECRET'),
     ],
+
+    // PHP-CLI-Binary für isolierte Subprozesse (QR-Code-Erzeugung). In FPM ist
+    // PHP_BINARY = php-fpm und damit ungeeignet, daher separat konfigurierbar.
+    'php_binary' => env('MGW_PHP_BINARY', '/usr/bin/php'),
 
 ];
