@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\SignatureImageController;
 use App\Http\Controllers\SignatureQrController;
+use App\Livewire\Admin\Account;
 use App\Livewire\Admin\Certificates;
 use App\Livewire\Admin\EntraUsers;
 use App\Livewire\Admin\SignatureEdit;
@@ -50,5 +51,6 @@ Route::prefix('admin')->group(function () {
         Route::get('/sig-qr/{qr}', [SignatureQrController::class, 'show'])->name('admin.sigqr');
         Route::get('/benutzer', EntraUsers::class)->name('admin.users');
         Route::get('/einstellungen', Settings::class)->name('admin.settings');
+        Route::get('/konto', Account::class)->name('admin.account');
     });
 });

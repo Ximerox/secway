@@ -69,9 +69,10 @@
     <a href="{{ route('admin.signatures') }}" @class(['active' => request()->routeIs('admin.signatures*')])>Signaturblöcke</a>
     <a href="{{ route('admin.users') }}" @class(['active' => request()->routeIs('admin.users')])>Benutzer</a>
     <a href="{{ route('admin.settings') }}" @class(['active' => request()->routeIs('admin.settings')])>Einstellungen</a>
+    <a href="{{ route('admin.account') }}" @class(['active' => request()->routeIs('admin.account')])>Konto</a>
     <form method="post" action="{{ route('admin.logout') }}">
         @csrf
-        <button type="submit">Abmelden ({{ auth()->user()?->name }})</button>
+        <button type="submit">Abmelden ({{ auth()->user()?->username ?? auth()->user()?->name }})</button>
     </form>
 </nav>
 <main>

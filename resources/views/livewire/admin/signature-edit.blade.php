@@ -288,6 +288,7 @@
                 toolbar: 'undo redo | fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | bullist numlist | table image link | platzhalter | code',
                 menubar: false,
                 height: 460,
+                font_family_formats: 'Century Gothic=century gothic,AppleGothic,sans-serif;Arial=arial,helvetica,sans-serif;Arial Black=arial black,sans-serif;Calibri=calibri,sans-serif;Comic Sans MS=comic sans ms,sans-serif;Courier New=courier new,courier,monospace;Georgia=georgia,serif;Tahoma=tahoma,arial,sans-serif;Times New Roman=times new roman,times,serif;Trebuchet MS=trebuchet ms,sans-serif;Verdana=verdana,geneva,sans-serif',
                 convert_urls: false,
                 branding: false,
                 promotion: false,

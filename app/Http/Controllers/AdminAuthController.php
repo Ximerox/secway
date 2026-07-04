@@ -20,20 +20,20 @@ class AdminAuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email' => ['required', 'email'],
+            'username' => ['required', 'string'],
             'password' => ['required'],
         ]);
 
         if (Auth::attempt($credentials, remember: true)) {
             $request->session()->regenerate();
-            AuditEvent::log('admin_login', ip: $request->ip(), details: ['email' => $credentials['email']]);
+            AuditEvent::log('admin_login', ip: $request->ip(), details: ['username' => $credentials['username']]);
 
             return redirect()->intended(route('admin.dashboard'));
         }
 
-        AuditEvent::log('admin_login_failed', ip: $request->ip(), details: ['email' => $credentials['email']]);
+        AuditEvent::log('admin_login_failed', ip: $request->ip(), details: ['username' => $credentials['username']]);
 
-        return back()->withErrors(['email' => 'Anmeldung fehlgeschlagen.'])->onlyInput('email');
+        return back()->withErrors(['username' => 'Anmeldung fehlgeschlagen.'])->onlyInput('username');
     }
 
     public function logout(Request $request)

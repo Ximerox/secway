@@ -40,10 +40,10 @@
     @endif
     <form method="post" action="{{ route('login') }}">
         @csrf
-        <label for="email">E-Mail-Adresse</label>
-        <input type="email" id="email" name="email" value="{{ old('email') }}" required autofocus>
+        <label for="username">Benutzername</label>
+        <input type="text" id="username" name="username" value="{{ old('username') }}" required autofocus autocomplete="username">
         <label for="password">Kennwort</label>
-        <input type="password" id="password" name="password" required>
+        <input type="password" id="password" name="password" required autocomplete="current-password">
         <button type="submit">Anmelden</button>
     </form>
 </div>
