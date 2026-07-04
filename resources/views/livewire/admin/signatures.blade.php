@@ -72,17 +72,6 @@
                     <input type="text" wire:model="name" placeholder="z.B. Standard-Signatur">
                     @error('name')<div class="error">{{ $message }}</div>@enderror
                 </div>
-                <div>
-                    <label>Zitierter Verlauf (Antworten/Weiterleitungen)</label>
-                    <label style="display:flex; gap:8px; align-items:center; margin:0; padding-top:9px;">
-                        <input type="checkbox" wire:model="clean_quotes" style="width:auto;">
-                        Frühere SecWay-Signaturen aus dem zitierten Verlauf entfernen
-                    </label>
-                    <div class="muted" style="margin-top:4px;">
-                        Fremde Signaturen (z.B. aus der CodeTwo-Zeit) bleiben stehen — die sind nicht markiert.
-                        Der Schutz gegen doppelte Signaturen bei Mehrfachverarbeitung ist immer aktiv.
-                    </div>
-                </div>
             </div>
 
             <div style="margin-top:12px;">
@@ -125,7 +114,7 @@
             @if ($sender_mode === 'users')
                 <div style="margin-top:10px;">
                     <label>Absenderadressen (kommagetrennt)</label>
-                    <textarea wire:model="sender_users" rows="2" style="width:100%;" placeholder="a.muster@straphael.de, b.muster@straphael.de"></textarea>
+                    <textarea wire:model="sender_users" rows="2" style="width:100%;" placeholder="vorname.nachname@example.org, weitere@example.org"></textarea>
                     @error('sender_users')<div class="error">{{ $message }}</div>@enderror
                 </div>
             @elseif ($sender_mode === 'group')
@@ -192,7 +181,7 @@
                 <div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end;">
                     <div>
                         <label>Testmail an</label>
-                        <input type="email" wire:model="test_to" placeholder="d.moeller@straphael.de">
+                        <input type="email" wire:model="test_to" placeholder="ihre-adresse@example.org">
                     </div>
                     <button type="button" class="btn ghost" onclick="sigTest()">Senden</button>
                 </div>

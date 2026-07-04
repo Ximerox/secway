@@ -52,9 +52,6 @@ class Signatures extends Component
 
     public string $text_body = '';
 
-    /** Checkbox in der UI; gespeichert als existing_mode replace|replace_all. */
-    public bool $clean_quotes = false;
-
     public bool $active = false;
 
     // Anwendungsregeln
@@ -125,7 +122,6 @@ class Signatures extends Component
         $this->name = '';
         $this->html = self::defaultHtml();
         $this->text_body = '';
-        $this->clean_quotes = false;
         $this->active = false;
         $this->priority = 10;
         $this->direction = 'both';
@@ -147,7 +143,6 @@ class Signatures extends Component
         $this->name = $t->name;
         $this->html = $t->html;
         $this->text_body = (string) $t->text_body;
-        $this->clean_quotes = $t->existing_mode === 'replace_all';
         $this->active = $t->active;
         $this->priority = (int) $t->priority;
         $this->direction = $t->direction;
@@ -199,7 +194,7 @@ class Signatures extends Component
             'name' => trim($this->name),
             'html' => $this->html,
             'text_body' => trim($this->text_body) !== '' ? $this->text_body : null,
-            'existing_mode' => $this->clean_quotes ? 'replace_all' : 'replace',
+            'existing_mode' => 'replace', // Doppelverarbeitungs-Schutz, immer aktiv
             'active' => $this->active,
             'priority' => $this->priority,
             'direction' => $this->direction,
