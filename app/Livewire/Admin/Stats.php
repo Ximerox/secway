@@ -5,6 +5,8 @@ namespace App\Livewire\Admin;
 use App\Models\AuditEvent;
 use App\Models\MessageRecipient;
 use App\Models\SecureMessage;
+use App\Models\Setting;
+use App\Models\SignatureTemplate;
 use App\Models\SmimeCertificate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -102,6 +104,12 @@ class Stats extends Component
             'avgMinutes' => $avgMinutes !== null ? (int) $avgMinutes : null,
             'topRecipientDomains' => array_slice($topRecipientDomains, 0, 8, true),
             'topSenders' => array_slice($topSenders, 0, 8, true),
+            'sigApplied' => $countEvent(['signature_applied']),
+            'sigSkipped' => $countEvent(['signature_skipped']),
+            'sigFailed' => $countEvent(['signature_failed']),
+            'sentItemsUpdated' => $countEvent(['sent_items_updated']),
+            'sigEnabled' => Setting::getBool('signature_enabled', false),
+            'sigActiveTemplates' => SignatureTemplate::where('active', true)->count(),
             'storeCount' => SecureMessage::count(),
             'storeBytes' => (int) SecureMessage::sum('size_bytes'),
             'unviewedNow' => MessageRecipient::whereNull('first_viewed_at')->count(),

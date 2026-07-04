@@ -1,7 +1,5 @@
 <div>
-    <script src="{{ asset('vendor/tinymce/tinymce.min.js') }}"></script>
-
-    <h1>Signatur-Vorlagen</h1>
+    <h1>Signaturblöcke</h1>
 
     @if (session('ok'))
         <div class="alert ok">{{ session('ok') }}</div>
@@ -13,7 +11,7 @@
     <div class="card">
         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
             <div>
-                <strong>Signatur-Modul:</strong>
+                <strong>Signaturblock-Modul:</strong>
                 @if ($module_enabled) <span class="badge ok">eingeschaltet</span>
                 @else <span class="badge off">ausgeschaltet</span>
                 @endif
@@ -28,7 +26,7 @@
             </label>
         </div>
         <div class="muted" style="margin-top:6px;">
-            Die Aktualisierung ersetzt die Kopie im Postausgang des Absenders durch die Fassung mit Signatur
+            Die Aktualisierung ersetzt die Kopie im Postausgang des Absenders durch die Fassung mit Signaturblock
             (dauert bis zu ~1 Minute). Benötigt die Graph-Berechtigung <code>Mail.ReadWrite</code> (Application)
             mit Admin-Consent. Mails mit Anhängen über 3 MB werden ausgelassen.
         </div>
@@ -37,7 +35,7 @@
     <div class="card">
         <div style="display:flex; align-items:center;">
             <h2 style="margin:0;">Vorlagen</h2>
-            <button class="btn" style="margin-left:auto;" wire:click="create">Neue Vorlage</button>
+            <a class="btn" style="margin-left:auto;" href="{{ route('admin.signatures.new') }}" wire:navigate>Neuer Signaturblock</a>
         </div>
         <table style="margin-top:12px;">
             <thead><tr><th>Prio</th><th>Name</th><th>Status</th><th>Absender</th><th>Empfänger</th><th>Zeitraum</th><th></th></tr></thead>
@@ -55,12 +53,12 @@
                     <td class="muted">{{ $t->recipientLabel() }}</td>
                     <td class="muted">{{ $t->periodLabel() }}</td>
                     <td style="text-align:right; white-space:nowrap;">
-                        <button class="btn small ghost" wire:click="edit({{ $t->id }})">Bearbeiten</button>
-                        <button class="btn small danger" wire:click="delete({{ $t->id }})" wire:confirm="Vorlage „{{ $t->name }}" wirklich löschen?">Löschen</button>
+                        <a class="btn small ghost" href="{{ route('admin.signatures.edit', $t) }}" wire:navigate>Bearbeiten</a>
+                        <button class="btn small danger" wire:click="delete({{ $t->id }})" wire:confirm="Signaturblock „{{ $t->name }}" wirklich löschen?">Löschen</button>
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="muted">Noch keine Vorlage — mit „Neue Vorlage" starten. Signaturen werden erst angehängt, wenn eine Vorlage aktiv ist und das Signatur-Modul oben eingeschaltet ist.</td></tr>
+                <tr><td colspan="7" class="muted">Noch kein Signaturblock — mit „Neuer Signaturblock" starten. Angehängt wird erst, wenn eine Vorlage aktiv ist und das Modul oben eingeschaltet ist.</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -69,305 +67,4 @@
             werden, steuert die „Weiterverarbeitung" je Vorlage.
         </div>
     </div>
-
-    @if ($editId !== null)
-        <div class="card">
-            <h2 style="margin-top:0;">{{ $editId ? 'Vorlage bearbeiten' : 'Neue Vorlage' }}</h2>
-
-            <div class="grid2">
-                <div>
-                    <label>Name</label>
-                    <input type="text" wire:model="name" placeholder="z.B. Standard-Signatur">
-                    @error('name')<div class="error">{{ $message }}</div>@enderror
-                </div>
-            </div>
-
-            <div style="margin-top:12px;">
-                <label>Signatur (HTML)</label>
-                <div wire:ignore>
-                    <textarea id="sig-html-editor"></textarea>
-                </div>
-                @error('html')<div class="error">{{ $message }}</div>@enderror
-                <div class="muted" style="margin-top:6px;">
-                    Platzhalter über den Toolbar-Knopf einfügen. Bedingte Zeilen: <code>@{{#if telefon}}Tel: @{{telefon}}@{{/if}}</code>
-                    — der Block erscheint nur, wenn das Attribut beim Absender gefüllt ist.
-                </div>
-            </div>
-
-            <div style="margin-top:12px;">
-                <label>Text-Variante (optional — für reine Text-Mails; leer = automatisch aus HTML abgeleitet)</label>
-                <textarea wire:model="text_body" rows="4" style="width:100%; font-family:monospace;" placeholder="@{{name}}&#10;@{{firma}}&#10;Tel: @{{telefon}}"></textarea>
-                @error('text_body')<div class="error">{{ $message }}</div>@enderror
-            </div>
-
-            <h2 style="margin-top:18px;">Anwendungsregeln</h2>
-            <div class="grid2">
-                <div>
-                    <label>Gilt für Mails an</label>
-                    <select wire:model="direction">
-                        <option value="both">Alle Empfänger (intern + extern)</option>
-                        <option value="external">Nur externe Empfänger</option>
-                        <option value="internal">Nur interne Empfänger</option>
-                    </select>
-                </div>
-                <div>
-                    <label>Absender</label>
-                    <select wire:model.live="sender_mode">
-                        <option value="all">Alle Benutzer</option>
-                        <option value="users">Bestimmte Adressen</option>
-                        <option value="group">Entra-Gruppe</option>
-                    </select>
-                </div>
-            </div>
-            @if ($sender_mode === 'users')
-                <div style="margin-top:10px;">
-                    <label>Absenderadressen (kommagetrennt; ganze Domains als @domain.de)</label>
-                    <textarea wire:model="sender_users" rows="2" style="width:100%;" placeholder="vorname.nachname@example.org, @example.org"></textarea>
-                    @error('sender_users')<div class="error">{{ $message }}</div>@enderror
-                </div>
-            @elseif ($sender_mode === 'group')
-                <div style="margin-top:10px;">
-                    <label>Gruppe</label>
-                    <select wire:model="sender_group_id">
-                        <option value="">— bitte wählen —</option>
-                        @foreach ($this->groupOptions as $gid => $gname)
-                            <option value="{{ $gid }}">{{ $gname }}</option>
-                        @endforeach
-                    </select>
-                    @error('sender_group_id')<div class="error">{{ $message }}</div>@enderror
-                    <div class="muted" style="margin-top:4px;">
-                        Mitgliedschaften werden beim stündlichen Entra-Sync aufgelöst — nach Gruppenänderungen
-                        ggf. auf der Benutzer-Seite manuell synchronisieren.
-                    </div>
-                </div>
-            @endif
-            <div style="margin-top:10px;">
-                <label>Absender-Ausnahmen (diese Absender NIE — kommagetrennt, Adressen oder @domain.de)</label>
-                <textarea wire:model="sender_exclude" rows="2" style="width:100%;" placeholder="chef@example.org, @extern-dienstleister.de"></textarea>
-                @error('sender_exclude')<div class="error">{{ $message }}</div>@enderror
-            </div>
-
-            <div class="grid2" style="margin-top:10px;">
-                <div>
-                    <label>Empfänger-Einschränkung (leer = alle passenden; Adressen oder @domain.de)</label>
-                    <textarea wire:model="recipient_include" rows="2" style="width:100%;" placeholder="@partner.de, kunde@example.org"></textarea>
-                    @error('recipient_include')<div class="error">{{ $message }}</div>@enderror
-                </div>
-                <div>
-                    <label>Empfänger-Ausnahmen (an diese Empfänger NIE)</label>
-                    <textarea wire:model="recipient_exclude" rows="2" style="width:100%;" placeholder="@no-signature.de"></textarea>
-                    @error('recipient_exclude')<div class="error">{{ $message }}</div>@enderror
-                </div>
-            </div>
-
-            <div class="grid2" style="margin-top:10px;">
-                <div>
-                    <label>Gültig von (leer = sofort)</label>
-                    <input type="date" wire:model="valid_from">
-                    @error('valid_from')<div class="error">{{ $message }}</div>@enderror
-                </div>
-                <div>
-                    <label>Gültig bis (leer = dauerhaft)</label>
-                    <input type="date" wire:model="valid_until">
-                    @error('valid_until')<div class="error">{{ $message }}</div>@enderror
-                </div>
-                <div>
-                    <label>Priorität (kleinere Zahl = zuerst geprüft)</label>
-                    <input type="number" wire:model="priority" min="1" max="999">
-                    @error('priority')<div class="error">{{ $message }}</div>@enderror
-                </div>
-            </div>
-
-            <h2 style="margin-top:18px;">Weiterverarbeitung</h2>
-            <div class="grid2">
-                <div>
-                    <label>Wenn diese Vorlage <strong>angewandt</strong> wird</label>
-                    <select wire:model="on_applied">
-                        <option value="stop">Danach keine weiteren Vorlagen mehr</option>
-                        <option value="continue">Weitere passende Vorlagen ebenfalls anwenden</option>
-                    </select>
-                </div>
-                <div>
-                    <label>Wenn diese Vorlage <strong>nicht</strong> angewandt wird</label>
-                    <select wire:model="on_not_applied">
-                        <option value="continue">Nächste Vorlage prüfen</option>
-                        <option value="stop">Danach keine weiteren Vorlagen mehr prüfen</option>
-                    </select>
-                </div>
-            </div>
-
-            <div style="margin-top:16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
-                <label style="display:flex; gap:8px; align-items:center; margin:0;">
-                    <input type="checkbox" wire:model="active" style="width:auto;"> Vorlage aktiv
-                </label>
-                <button type="button" class="btn" onclick="sigSave()">Speichern</button>
-                <span class="muted" wire:loading>wird verarbeitet …</span>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2 style="margin-top:0;">Vorschau &amp; Test</h2>
-            <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-                <div>
-                    <label>Mit Daten von</label>
-                    <select wire:model="preview_user">
-                        @foreach ($previewUsers as $u)
-                            <option value="{{ $u->mail }}">{{ $u->display_name }} ({{ $u->mail }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <button type="button" class="btn" onclick="sigPreview()">Vorschau aktualisieren</button>
-                <div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end;">
-                    <div>
-                        <label>Testmail an</label>
-                        <input type="email" wire:model="test_to" placeholder="ihre-adresse@example.org">
-                    </div>
-                    <button type="button" class="btn ghost" onclick="sigTest()">Senden</button>
-                </div>
-            </div>
-            @error('test_to')<div class="error">{{ $message }}</div>@enderror
-            @if ($previewHtml !== '')
-                <iframe style="width:100%; height:240px; border:1px solid #e5e7eb; border-radius:8px; background:#ffffff; margin-top:12px;" srcdoc="{{ $previewHtml }}"></iframe>
-            @endif
-        </div>
-
-        <div class="card">
-            <h2 style="margin-top:0;">Bilder (werden beim Versand eingebettet, kein Nachladen)</h2>
-            <input type="file" wire:model="upload" accept="image/*">
-            @error('upload')<div class="error">{{ $message }}</div>@enderror
-            <span class="muted" wire:loading wire:target="upload">wird hochgeladen …</span>
-            @if ($images->isNotEmpty())
-                <table style="margin-top:12px;">
-                    <thead><tr><th>Vorschau</th><th>Datei</th><th>Größe</th><th></th></tr></thead>
-                    <tbody>
-                    @foreach ($images as $img)
-                        <tr>
-                            <td><img src="{{ route('admin.sigimg', $img) }}" alt="" style="max-height:40px; max-width:160px;"></td>
-                            <td class="muted">{{ $img->original_name }}</td>
-                            <td class="muted">{{ number_format($img->size / 1024, 0, ',', '.') }} KB</td>
-                            <td style="text-align:right; white-space:nowrap;">
-                                <button type="button" class="btn small ghost" onclick="sigInsertImage('{{ route('admin.sigimg', $img) }}')">In Editor einfügen</button>
-                                <button class="btn small danger" wire:click="deleteImage({{ $img->id }})" wire:confirm="Bild „{{ $img->original_name }}" löschen?">Löschen</button>
-                            </td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-            @endif
-        </div>
-
-        <div class="card">
-            <div style="display:flex; align-items:center;">
-                <h2 style="margin:0;">QR-Codes (z.B. vCard zum Abscannen)</h2>
-                <button type="button" class="btn" style="margin-left:auto;" wire:click="newQr">Neuer QR-Code</button>
-            </div>
-            <div class="muted" style="margin-top:6px;">
-                Der QR-Inhalt darf Platzhalter enthalten und wird pro Absender erzeugt und eingebettet.
-                In der Vorlagen-Vorschau erscheint er mit den Daten des gewählten Benutzers.
-            </div>
-
-            @if ($qrEditId !== null)
-                <div style="border:1px solid #e5e7eb; border-radius:8px; padding:12px; margin-top:12px;">
-                    <div class="grid2">
-                        <div>
-                            <label>Bezeichnung</label>
-                            <input type="text" wire:model="qr_label" placeholder="z.B. vCard Kontaktdaten">
-                            @error('qr_label')<div class="error">{{ $message }}</div>@enderror
-                        </div>
-                        <div>
-                            <label>Größe (px)</label>
-                            <input type="number" wire:model="qr_size" min="80" max="400">
-                            @error('qr_size')<div class="error">{{ $message }}</div>@enderror
-                        </div>
-                    </div>
-                    <div style="margin-top:10px;">
-                        <label>Inhalt (Platzhalter erlaubt)</label>
-                        <textarea wire:model="qr_text" rows="8" style="width:100%; font-family:monospace;"></textarea>
-                        @error('qr_text')<div class="error">{{ $message }}</div>@enderror
-                    </div>
-                    <div style="margin-top:10px; display:flex; gap:10px;">
-                        <button type="button" class="btn" wire:click="saveQr">QR-Code speichern</button>
-                        <button type="button" class="btn ghost" wire:click="cancelQr">Abbrechen</button>
-                    </div>
-                </div>
-            @endif
-
-            @if ($qrCodes->isNotEmpty())
-                <table style="margin-top:12px;">
-                    <thead><tr><th>Vorschau</th><th>Bezeichnung</th><th>Größe</th><th></th></tr></thead>
-                    <tbody>
-                    @foreach ($qrCodes as $qr)
-                        <tr>
-                            <td><img src="{{ route('admin.sigqr', $qr) }}" alt="" style="height:44px; width:44px;"></td>
-                            <td><strong>{{ $qr->label }}</strong></td>
-                            <td class="muted">{{ $qr->size }} px</td>
-                            <td style="text-align:right; white-space:nowrap;">
-                                <button type="button" class="btn small ghost" onclick="sigInsertImage('{{ route('admin.sigqr', $qr) }}')">In Editor einfügen</button>
-                                <button type="button" class="btn small ghost" wire:click="editQr({{ $qr->id }})">Bearbeiten</button>
-                                <button class="btn small danger" wire:click="deleteQr({{ $qr->id }})" wire:confirm="QR-Code „{{ $qr->label }}" löschen?">Löschen</button>
-                            </td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-            @endif
-        </div>
-    @endif
-
-    <script>
-        // Nur Daten ablegen — Livewire ist zu diesem Zeitpunkt noch nicht geladen,
-        // die Komponenten-Referenz wird deshalb erst beim Klick aufgelöst (sigWire()).
-        window.SIG_WIRE_ID = '{{ $this->getId() }}';
-        window.SIG_PLACEHOLDERS = @json(\App\Livewire\Admin\Signatures::PLACEHOLDERS);
-    </script>
-    <script>
-    @verbatim
-        function sigInitEditor(html) {
-            if (!window.tinymce) return;
-            tinymce.remove('#sig-html-editor');
-            const ta = document.getElementById('sig-html-editor');
-            if (!ta) return;
-            ta.value = html;
-            tinymce.init({
-                selector: '#sig-html-editor',
-                plugins: 'table image link code lists',
-                toolbar: 'undo redo | fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | bullist numlist | table image link | platzhalter | code',
-                menubar: false,
-                height: 340,
-                convert_urls: false,
-                branding: false,
-                promotion: false,
-                setup: (editor) => {
-                    editor.ui.registry.addMenuButton('platzhalter', {
-                        text: 'Platzhalter',
-                        fetch: (cb) => cb(Object.entries(window.SIG_PLACEHOLDERS).map(([key, label]) => ({
-                            type: 'menuitem',
-                            text: label + '  {{' + key + '}}',
-                            onAction: () => editor.insertContent('{{' + key + '}}'),
-                        }))),
-                    });
-                },
-            });
-        }
-        function sigWire() {
-            return window.Livewire.find(window.SIG_WIRE_ID);
-        }
-        async function sigCollect() {
-            const ed = window.tinymce && tinymce.get('sig-html-editor');
-            if (ed) { await sigWire().set('html', ed.getContent(), false); }
-        }
-        async function sigSave() { await sigCollect(); sigWire().call('save'); }
-        async function sigPreview() { await sigCollect(); sigWire().call('preview'); }
-        async function sigTest() { await sigCollect(); sigWire().call('sendTest'); }
-        function sigInsertImage(url) {
-            const ed = window.tinymce && tinymce.get('sig-html-editor');
-            if (ed) ed.insertContent('<img src="' + url + '" alt="">');
-        }
-        document.addEventListener('livewire:init', () => {
-            Livewire.on('sig-editor', ({ html }) => {
-                setTimeout(() => sigInitEditor(html), 60);
-            });
-        });
-    @endverbatim
-    </script>
 </div>

@@ -86,6 +86,23 @@
             </table>
         </div>
 
+        {{-- Signaturblöcke --}}
+        <div class="card">
+            <strong>Signaturblöcke</strong>
+            @if ($sigEnabled)
+                <span class="badge ok" style="margin-left:6px;">Modul aktiv</span>
+            @else
+                <span class="badge off" style="margin-left:6px;">Modul aus</span>
+            @endif
+            <table class="plain">
+                <tr><td>Signaturblöcke angehängt</td><td class="mono" style="text-align:right;">{{ number_format($sigApplied, 0, ',', '.') }}</td></tr>
+                <tr><td>übersprungen (S/MIME, Kalender, …)</td><td class="mono" style="text-align:right;">{{ number_format($sigSkipped, 0, ',', '.') }}</td></tr>
+                <tr><td>Postausgang aktualisiert</td><td class="mono" style="text-align:right;">{{ number_format($sentItemsUpdated, 0, ',', '.') }}</td></tr>
+                <tr><td>Fehler bei der Verarbeitung</td><td class="mono" style="text-align:right;">{{ $sigFailed > 0 ? '⚠ ' : '' }}{{ number_format($sigFailed, 0, ',', '.') }}</td></tr>
+                <tr><td>aktive Vorlagen</td><td class="mono" style="text-align:right;"><a href="{{ route('admin.signatures') }}">{{ number_format($sigActiveTemplates, 0, ',', '.') }}</a></td></tr>
+            </table>
+        </div>
+
         {{-- Top-Listen --}}
         <div class="card">
             <strong>Häufigste Empfänger-Domains</strong>
