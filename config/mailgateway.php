@@ -32,4 +32,12 @@ return [
     'secret_header' => 'X-MGW-Auth',
     'ingest_secret' => env('MGW_INGEST_SECRET'),
 
+    // Microsoft Graph (Entra ID) für das Signatur-Modul: Client-Credentials-Flow,
+    // Application-Berechtigung User.Read.All. Sync via `php artisan entra:sync`.
+    'graph' => [
+        'tenant_id' => env('GRAPH_TENANT_ID'),
+        'client_id' => env('GRAPH_CLIENT_ID'),
+        'client_secret' => env('GRAPH_CLIENT_SECRET'),
+    ],
+
 ];
