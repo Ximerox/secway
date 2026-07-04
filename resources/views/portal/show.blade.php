@@ -28,4 +28,37 @@
     @else
         <p class="muted">Diese Nachricht enthält keinen Text.</p>
     @endif
+
+    @if ($replyEnabled)
+        <h2 id="antworten">Antworten</h2>
+
+        @if (session('reply_ok'))
+            <div class="alert ok">{{ session('reply_ok') }}</div>
+        @endif
+        @if (session('reply_error'))
+            <div class="alert">{{ session('reply_error') }}</div>
+        @endif
+        @if ($errors->any())
+            <div class="alert">{{ $errors->first() }}</div>
+        @endif
+
+        @if ($repliesLeft > 0)
+            <form method="post" action="{{ url('/m/'.$recipient->token.'/reply') }}"
+                  enctype="multipart/form-data" class="replyform">
+                @csrf
+                <textarea name="reply_text" rows="7" maxlength="50000" required
+                          placeholder="Ihre Antwort an {{ $msg->sender_name ?: $msg->sender_email }} …">{{ old('reply_text') }}</textarea>
+                <label class="filelabel">
+                    Dateien anhängen (optional, zusammen max. {{ $replyMaxMb }} MB)
+                    <input type="file" name="files[]" multiple>
+                </label>
+                <button type="submit">Antwort sicher übermitteln</button>
+                <p class="muted">Ihre Antwort wird verschlüsselt übertragen und dem Absender direkt zugestellt.
+                    Anhänge werden automatisch auf Schadsoftware geprüft.</p>
+            </form>
+        @else
+            <p class="muted">Für diese Nachricht wurden bereits alle verfügbaren Antworten genutzt.
+                Bitte wenden Sie sich direkt per E-Mail an den Absender.</p>
+        @endif
+    @endif
 @endsection

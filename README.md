@@ -41,7 +41,9 @@ flowchart LR
   is encrypted (and optionally signed) automatically. No subject tag needed.
 - **Portal** — if the sender tagged the subject (default `[sicher]`) and no certificate exists,
   the message and its attachments are stored encrypted on the gateway. The recipient gets a
-  link by mail and — configurable minutes later — a password in a separate mail.
+  link by mail and — configurable minutes later — a password in a separate mail. Recipients
+  can **reply directly in the portal** (text + attachments, ClamAV-scanned); the reply is
+  delivered to the internal sender's inbox.
 - **Pass-through** — everything else is delivered unchanged.
 
 ### Inbound
@@ -70,7 +72,10 @@ S/MIME **signing** above.
 
 - **Zero client footprint** — no plugins, no per-user setup; routing decisions are automatic
 - **Recipient portal** — token link + password (delivered time-shifted), brute-force lockout,
-  download tracking, automatic reminders, automatic expiry and irreversible deletion
+  download tracking, automatic reminders, automatic expiry and irreversible deletion; optional
+  **secure replies** (text + attachments) with mandatory ClamAV scanning, per-message reply
+  limit and rate limiting — no `Reply-To` on the delivered mail, so a careless Outlook reply
+  can never bypass the gateway
 - **Certificate management** — upload (PFX/PEM) for addresses or whole domains, automatic
   harvesting from verified inbound signatures, expiry overview
 - **Admin UI** (German) — statistics dashboard, message list with remind/delete, live Postfix
@@ -151,8 +156,7 @@ portal passwords are stored as bcrypt hashes only. Every action is written to an
 ## Status & roadmap
 
 In production at a German non-profit since 2026, including the signature-block module for
-external and internal mail. Roadmap: reply-from-portal for external recipients, optional
-AES-GCM/OAEP cipher profile.
+external and internal mail and portal replies. Roadmap: optional AES-GCM/OAEP cipher profile.
 
 ## License
 

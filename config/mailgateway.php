@@ -23,6 +23,13 @@ return [
     // Auslöse-Tag im Betreff, wird vor der Ablage entfernt
     'subject_tag' => env('MGW_SUBJECT_TAG', '[sicher]'),
 
+    // Portal-Antworten: externe Empfänger können auf die zugestellte Nachricht
+    // antworten (Text + Anhänge, ClamAV-geprüft). Zustellung an den internen
+    // Absender. Alle Werte in den Admin-Einstellungen überschreibbar.
+    'reply_enabled' => env('MGW_REPLY_ENABLED', false),
+    'reply_max_size_mb' => env('MGW_REPLY_MAX_SIZE_MB', 20),
+    'reply_max_per_message' => env('MGW_REPLY_MAX_PER_MESSAGE', 5),
+
     // Eigene (interne) Domains, kommagetrennt — Empfänger dieser Domains
     // gelten als eingehende Mail (Entschlüsselung/Signaturprüfung/Ernten)
     'internal_domains' => env('MGW_INTERNAL_DOMAINS', ''),

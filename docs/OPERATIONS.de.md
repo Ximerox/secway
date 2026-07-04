@@ -89,6 +89,13 @@ Betriebssystem-Sicherheitsupdates installiert `unattended-upgrades` automatisch;
 - **Empfänger erinnern:** Admin → Nachrichten → *Erinnern* (oder automatisch via Einstellung
   „Erinnerung nach (Stunden)").
 - **Kennwort-Mail sofort auslösen:** Admin → Warteschlange → *Jetzt senden*.
+- **Portal-Antworten aktivieren/begrenzen:** Admin → Einstellungen → *Portal-Antworten*
+  (Schalter, max. Anhangsgröße, max. Antworten pro Nachricht). Voraussetzung: `clamav-daemon`
+  läuft — ohne erreichbaren Virenscanner werden Antworten mit Anhang abgelehnt (fail-closed).
+- **Portal meldet „Antwort konnte nicht geprüft werden":** ClamAV prüfen —
+  `systemctl status clamav-daemon`, Test: `runuser -u www-data -- clamdscan --fdpass /etc/hostname`.
+  Abgelehnte Anhänge stehen mit Signaturnamen im Protokoll (`reply_rejected`). Es wird nie
+  ungeprüft zugestellt.
 - **Impressum/Datenschutz ändern:** Admin → Einstellungen → HTML-Felder unten.
 - **Eigenes Kennwort / Benutzername ändern:** Admin → Konto.
 - **Weiteren Admin-Benutzer anlegen:** per Tinker (siehe INSTALL.md, „First admin user").

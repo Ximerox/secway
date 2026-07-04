@@ -30,6 +30,9 @@ Required PHP extensions: `openssl`, `mbstring`, `xml`/`dom`, `curl`, `mysql` (PD
 `intl`, `bcmath`, `zip`, and **`gd`** (the last is needed for QR codes in the signature-block
 module). `openssl` powers all S/MIME operations and is part of PHP's core build on Debian.
 
+For the optional **portal-reply** feature additionally install `clamav-daemon` +
+`clamav-freshclam` (see the "Portal replies" subsection below).
+
 ## 2. Database
 
 ```bash
@@ -86,6 +89,32 @@ php artisan tinker --execute="
 ```
 
 Afterwards change the password anytime under **Admin → Konto**.
+
+### Portal replies (optional)
+
+External recipients can reply to a portal message (text + attachments); the reply is mailed
+to the internal sender. Attachments are **always** scanned with ClamAV before delivery —
+if the scanner is unreachable, the reply is rejected (fail-closed), so the daemon is a hard
+requirement once the feature is on:
+
+```bash
+apt install clamav-daemon clamav-freshclam
+systemctl enable --now clamav-freshclam clamav-daemon
+# first start waits for freshclam to download signatures (~100 MB) — check with:
+runuser -u www-data -- clamdscan --fdpass --no-summary /etc/hostname   # expects: OK
+```
+
+Raise the upload limits to match the reply size limit you configure in the admin UI
+(`upload_max_filesize` / `post_max_size` in `/etc/php/8.4/fpm/php.ini`, then reload
+`php8.4-fpm`; `client_max_body_size` in the nginx vhost). Keep in mind the upstream mail
+system must also *accept* mails of that size on delivery to the internal sender.
+
+Enable and tune under **Admin → Einstellungen → Portal-Antworten** (off by default):
+max total attachment size per reply, max replies per message. Replies are rate-limited
+per IP and only possible while the message is unlocked and not expired. The delivered
+mail deliberately has **no Reply-To** pointing at the external address — a careless
+Outlook reply would bypass the gateway; instead the mail contains a mailto link with
+the subject tag preset.
 
 ## 4. nginx + TLS
 

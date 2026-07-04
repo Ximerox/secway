@@ -24,6 +24,12 @@ class Settings extends Component
 
     public int $reminder_after_hours = 0;
 
+    public bool $reply_enabled = false;
+
+    public int $reply_max_size_mb = 20;
+
+    public int $reply_max_per_message = 5;
+
     public string $internal_domains = '';
 
     public string $operator_name = '';
@@ -40,6 +46,9 @@ class Settings extends Component
         $this->retention_days = (int) Setting::get('retention_days', config('mailgateway.retention_days'));
         $this->password_delay_minutes = (int) Setting::get('password_delay_minutes', config('mailgateway.password_delay_minutes'));
         $this->reminder_after_hours = (int) Setting::get('reminder_after_hours', config('mailgateway.reminder_after_hours'));
+        $this->reply_enabled = Setting::getBool('reply_enabled', (bool) config('mailgateway.reply_enabled'));
+        $this->reply_max_size_mb = (int) Setting::get('reply_max_size_mb', config('mailgateway.reply_max_size_mb'));
+        $this->reply_max_per_message = (int) Setting::get('reply_max_per_message', config('mailgateway.reply_max_per_message'));
         $this->internal_domains = (string) Setting::get('internal_domains', config('mailgateway.internal_domains'));
         $this->operator_name = Setting::operator();
         $this->legal_impressum = (string) Setting::get('legal_impressum', '');
@@ -53,6 +62,8 @@ class Settings extends Component
             'retention_days' => 'required|integer|min:1|max:365',
             'password_delay_minutes' => 'required|integer|min:0|max:60',
             'reminder_after_hours' => 'required|integer|min:0|max:2160',
+            'reply_max_size_mb' => 'required|integer|min:1|max:50',
+            'reply_max_per_message' => 'required|integer|min:1|max:50',
             'internal_domains' => ['required', 'regex:/^[a-z0-9.-]+(\s*,\s*[a-z0-9.-]+)*$/i'],
             'operator_name' => 'required|string|min:2|max:100',
             'legal_impressum' => 'nullable|string|max:60000',
@@ -72,6 +83,9 @@ class Settings extends Component
         Setting::set('retention_days', $this->retention_days);
         Setting::set('password_delay_minutes', $this->password_delay_minutes);
         Setting::set('reminder_after_hours', $this->reminder_after_hours);
+        Setting::set('reply_enabled', $this->reply_enabled);
+        Setting::set('reply_max_size_mb', $this->reply_max_size_mb);
+        Setting::set('reply_max_per_message', $this->reply_max_per_message);
         Setting::set('internal_domains', strtolower(trim($this->internal_domains)));
         Setting::set('operator_name', trim($this->operator_name));
         Setting::set('legal_impressum', trim($this->legal_impressum));
@@ -84,6 +98,9 @@ class Settings extends Component
             'retention_days' => $this->retention_days,
             'password_delay_minutes' => $this->password_delay_minutes,
             'reminder_after_hours' => $this->reminder_after_hours,
+            'reply_enabled' => $this->reply_enabled,
+            'reply_max_size_mb' => $this->reply_max_size_mb,
+            'reply_max_per_message' => $this->reply_max_per_message,
             'internal_domains' => strtolower(trim($this->internal_domains)),
             'operator_name' => trim($this->operator_name),
         ]);

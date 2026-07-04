@@ -31,6 +31,17 @@
         background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
         border-radius: 8px; padding: 10px 14px; margin: 14px 0; font-size: 14.5px;
     }
+    .alert.ok { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+    .replyform { flex-direction: column; align-items: stretch; }
+    .replyform textarea {
+        padding: 11px 14px; font-size: 15px; border: 1px solid #d1d5db;
+        border-radius: 8px; font-family: inherit; resize: vertical;
+    }
+    .replyform textarea:focus { outline: 2px solid #1d4e89; border-color: #1d4e89; }
+    .replyform .filelabel { font-size: 14px; color: #374151; }
+    .replyform input[type=file] { display: block; margin-top: 6px; font-size: 14px; }
+    .replyform button { align-self: flex-start; }
+    .replyform .muted { margin-bottom: 0; }
     form { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
     input[type=password] {
         flex: 1 1 220px; padding: 11px 14px; font-size: 16px;

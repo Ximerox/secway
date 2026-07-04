@@ -29,6 +29,8 @@ class AuditEvent extends Model
         'unlocked' => 'Portal',
         'unlock_failed' => 'Portal',
         'downloaded' => 'Portal',
+        'reply_sent' => 'Portal',
+        'reply_rejected' => 'Portal',
         'purged' => 'System',
         'ingest_rejected' => 'abgewiesen',
         'ingest_loop_dropped' => 'abgewiesen',

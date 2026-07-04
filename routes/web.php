@@ -29,6 +29,7 @@ Route::view('/datenschutz', 'portal.datenschutz')->name('datenschutz');
 Route::get('/m/{token}', [PortalController::class, 'show']);
 Route::post('/m/{token}', [PortalController::class, 'unlock'])->middleware('throttle:10,1');
 Route::get('/m/{token}/download/{attachment}', [PortalController::class, 'download'])->middleware('throttle:60,1');
+Route::post('/m/{token}/reply', [PortalController::class, 'reply'])->middleware('throttle:6,10');
 
 Route::prefix('admin')->group(function () {
     Route::get('login', [AdminAuthController::class, 'showLogin'])->name('login');

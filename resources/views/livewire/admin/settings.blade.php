@@ -66,6 +66,33 @@
         </div>
 
         <div class="card">
+            <h2 style="margin-top:0;">Portal-Antworten</h2>
+
+            <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;cursor:pointer;">
+                <input type="checkbox" wire:model="reply_enabled" style="margin-top:3px;">
+                <span>
+                    <strong>Empfänger dürfen über das Portal antworten</strong><br>
+                    <span class="muted">Externe Empfänger können nach dem Entsperren direkt im Portal antworten — mit Text und Dateianhängen. Die Antwort wird dem internen Absender per E-Mail zugestellt. Alle Anhänge werden vor der Zustellung mit ClamAV auf Schadsoftware geprüft.</span>
+                </span>
+            </label>
+
+            <div class="grid2" style="margin-top:14px;">
+                <div>
+                    <label>Max. Anhangsgröße pro Antwort (MB)</label>
+                    <input type="text" wire:model="reply_max_size_mb" style="max-width:120px;">
+                    @error('reply_max_size_mb')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">Gesamtgröße aller Dateien einer Antwort. Die Limits von PHP (<code>upload_max_filesize</code>/<code>post_max_size</code>) und nginx (<code>client_max_body_size</code>) müssen mindestens ebenso groß sein — ebenso das Empfangslimit des Mailsystems.</p>
+                </div>
+                <div>
+                    <label>Max. Antworten pro Nachricht</label>
+                    <input type="text" wire:model="reply_max_per_message" style="max-width:120px;">
+                    @error('reply_max_per_message')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">Begrenzt, wie oft ein Empfänger auf dieselbe Portal-Nachricht antworten kann (Missbrauchsschutz — das Portal soll kein freier Mail-Kanal werden).</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
             <h2 style="margin-top:0;">Betreiber &amp; Rechtliches</h2>
 
             <label>Name des Betreibers</label>
