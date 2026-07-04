@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\EntraUser;
 use App\Models\SignatureTemplate;
 use App\Support\InternalDomains;
+use App\Support\RawMail;
 use ZBateson\MailMimeParser\Message;
 
 /**
@@ -140,27 +141,91 @@ class SignatureMailService
             }
         }
 
-        // Bilder der neuen Signatur anhängen (falls nicht schon vorhanden)
-        $existingCids = array_map(
-            fn ($p) => trim((string) $p->getContentId(), '<> '),
-            $message->getAllAttachmentParts()
-        );
+        $out = $message->__toString();
+
+        // Bilder der neuen Signatur anhängen — auf Raw-Ebene, struktur-erhaltend.
+        // (zbatesons addAttachmentPart flacht multipart/alternative zu mixed ab,
+        // dann zeigen Clients Text- UND HTML-Teil nacheinander an.)
+        $newImages = [];
         foreach ($images as $cid => $img) {
-            if (in_array($cid, $existingCids, true) || ! is_readable($img['path'])) {
-                continue;
+            if (! str_contains($out, '<'.$cid.'>') && is_readable($img['path'])) {
+                $newImages[$cid] = $img;
             }
-            $message->addAttachmentPart(file_get_contents($img['path']), $img['mime'], basename($img['path']), 'inline');
-            $parts = $message->getAllAttachmentParts();
-            $new = end($parts);
-            $new->setRawHeader('Content-ID', '<'.$cid.'>');
+        }
+        if ($newImages !== []) {
+            $out = $this->attachInlineImages($out, $newImages);
         }
 
         return [
-            'raw' => $message->__toString(),
+            'raw' => $out,
             'applied' => $templates->pluck('name')->all(),
             'replaced' => $replaced,
             'skipped' => null,
         ];
+    }
+
+    /**
+     * Hängt Inline-Bilder an, ohne die MIME-Struktur zu zerstören:
+     * bestehendes multipart/mixed|related wird ergänzt, alles andere
+     * (multipart/alternative, Einzelpart) in multipart/related eingepackt —
+     * die Struktur, die Mail-Clients selbst für Inline-Bilder erzeugen.
+     */
+    protected function attachInlineImages(string $raw, array $images): string
+    {
+        [$headers, $body] = RawMail::split($raw);
+        $ctLine = (string) RawMail::findHeader($headers, 'content-type');
+
+        if (preg_match('~multipart/(mixed|related)~i', $ctLine)
+            && preg_match('~boundary=("?)([^";\s]+)\1~i', $ctLine, $m)) {
+            $boundary = $m[2];
+            $closing = '--'.$boundary.'--';
+            $pos = strrpos($body, $closing);
+            if ($pos !== false) {
+                $parts = '';
+                foreach ($images as $cid => $img) {
+                    $parts .= $this->imagePartMime($boundary, $cid, $img);
+                }
+
+                return $headers."\r\n\r\n".substr($body, 0, $pos).$parts.$closing.substr($body, $pos + strlen($closing));
+            }
+        }
+
+        // Umschlag: multipart/related um die komplette bisherige Nachricht
+        $boundary = '=MGW-REL-'.bin2hex(random_bytes(12));
+        $inner = [];
+        $outer = [];
+        foreach (RawMail::headerLines($headers) as $line) {
+            $folded = str_replace("\n", "\r\n", $line);
+            if (in_array(RawMail::headerName($line), ['content-type', 'content-transfer-encoding'], true)) {
+                $inner[] = $folded;
+            } else {
+                $outer[] = $folded;
+            }
+        }
+        if ($inner === []) {
+            $inner[] = 'Content-Type: text/plain';
+        }
+        $outer[] = 'Content-Type: multipart/related;'."\r\n\t".'boundary="'.$boundary.'"';
+
+        $out = implode("\r\n", $outer)."\r\n\r\n";
+        $out .= '--'.$boundary."\r\n".implode("\r\n", $inner)."\r\n\r\n".$body."\r\n";
+        foreach ($images as $cid => $img) {
+            $out .= $this->imagePartMime($boundary, $cid, $img);
+        }
+
+        return $out.'--'.$boundary."--\r\n";
+    }
+
+    protected function imagePartMime(string $boundary, string $cid, array $img): string
+    {
+        $name = basename($img['path']);
+
+        return '--'.$boundary."\r\n"
+            .'Content-Type: '.$img['mime'].'; name="'.$name.'"'."\r\n"
+            ."Content-Transfer-Encoding: base64\r\n"
+            .'Content-Disposition: inline; filename="'.$name.'"'."\r\n"
+            .'Content-ID: <'.$cid.'>'."\r\n\r\n"
+            .chunk_split(base64_encode((string) file_get_contents($img['path'])), 76, "\r\n");
     }
 
     /** Mails, die grundsätzlich nicht angefasst werden. */
