@@ -19,6 +19,8 @@ class AuditEvent extends Model
         'signature_applied' => 'ausgehend',
         'signature_skipped' => 'ausgehend',
         'signature_failed' => 'ausgehend',
+        'sent_items_updated' => 'ausgehend',
+        'sent_items_failed' => 'ausgehend',
         'passed_through' => 'ausgehend',
         'ingest_stored' => 'ausgehend',
         'recipient_notified' => 'ausgehend',

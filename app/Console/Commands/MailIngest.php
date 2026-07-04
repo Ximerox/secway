@@ -8,6 +8,7 @@ use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\MessageRecipient;
 use App\Models\SecureMessage;
+use App\Models\SentItemsUpdate;
 use App\Models\Setting;
 use App\Models\SmimeCertificate;
 use App\Services\SignatureMailService;
@@ -133,6 +134,12 @@ class MailIngest extends Command
                         'mode' => $sig['replaced'] ? 'ersetzt' : 'angehängt',
                         'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
                     ]);
+
+                    // Optional: Kopie in „Gesendete Elemente" später durch die
+                    // signierte Fassung ersetzen (mail:update-sent-items)
+                    if (Setting::getBool('sent_items_update', false)) {
+                        SentItemsUpdate::queueFor($sender, $parsed, $raw);
+                    }
                 } elseif ($sig['skipped'] !== null) {
                     AuditEvent::log('signature_skipped', details: [
                         'queue_id' => $queueId,

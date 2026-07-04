@@ -22,6 +22,15 @@
                 <input type="checkbox" wire:model.live="module_enabled" style="width:auto;">
                 Mails verarbeiten (aktive Vorlagen anwenden)
             </label>
+            <label style="display:flex; gap:8px; align-items:center; margin:0;">
+                <input type="checkbox" wire:model.live="sent_items_update" style="width:auto;">
+                „Gesendete Elemente" nachträglich aktualisieren
+            </label>
+        </div>
+        <div class="muted" style="margin-top:6px;">
+            Die Aktualisierung ersetzt die Kopie im Postausgang des Absenders durch die Fassung mit Signatur
+            (dauert bis zu ~1 Minute). Benötigt die Graph-Berechtigung <code>Mail.ReadWrite</code> (Application)
+            mit Admin-Consent. Mails mit Anhängen über 3 MB werden ausgelassen.
         </div>
     </div>
 

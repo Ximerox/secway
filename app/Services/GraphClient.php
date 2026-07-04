@@ -65,6 +65,45 @@ class GraphClient
         );
     }
 
+    /** Sucht eine Mail im Ordner „Gesendete Elemente" anhand der Internet-Message-ID. */
+    public function findSentItem(string $user, string $internetMessageId): ?array
+    {
+        $filter = rawurlencode("internetMessageId eq '".str_replace("'", "''", $internetMessageId)."'");
+        $resp = Http::withToken($this->token())->timeout(60)->get(
+            'https://graph.microsoft.com/v1.0/users/'.rawurlencode($user)
+            .'/mailFolders/sentitems/messages?$filter='.$filter.'&$select=id,sentDateTime,internetMessageId'
+        );
+        if (! $resp->successful()) {
+            throw new RuntimeException('Graph-Suche in sentitems fehlgeschlagen ('.$resp->status().'): '.substr($resp->body(), 0, 300));
+        }
+
+        return $resp->json('value')[0] ?? null;
+    }
+
+    /** Legt eine Nachricht direkt im Ordner „Gesendete Elemente" an. */
+    public function createSentItem(string $user, array $payload): array
+    {
+        $resp = Http::withToken($this->token())->timeout(120)->post(
+            'https://graph.microsoft.com/v1.0/users/'.rawurlencode($user).'/mailFolders/sentitems/messages',
+            $payload
+        );
+        if (! $resp->successful()) {
+            throw new RuntimeException('Graph-Anlage in sentitems fehlgeschlagen ('.$resp->status().'): '.substr($resp->body(), 0, 500));
+        }
+
+        return (array) $resp->json();
+    }
+
+    public function deleteMessage(string $user, string $messageId): void
+    {
+        $resp = Http::withToken($this->token())->timeout(60)->delete(
+            'https://graph.microsoft.com/v1.0/users/'.rawurlencode($user).'/messages/'.rawurlencode($messageId)
+        );
+        if (! $resp->successful() && $resp->status() !== 404) {
+            throw new RuntimeException('Graph-Löschung fehlgeschlagen ('.$resp->status().'): '.substr($resp->body(), 0, 300));
+        }
+    }
+
     /** Seitenweiser Abruf einer Graph-Collection. */
     protected function fetchAll(string $url): array
     {

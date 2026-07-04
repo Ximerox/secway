@@ -81,10 +81,22 @@ class Signatures extends Component
 
     public bool $module_enabled = false;
 
+    public bool $sent_items_update = false;
+
     public function mount(): void
     {
         $this->preview_user = (string) (EntraUser::orderBy('display_name')->value('mail') ?? '');
         $this->module_enabled = Setting::getBool('signature_enabled', false);
+        $this->sent_items_update = Setting::getBool('sent_items_update', false);
+    }
+
+    public function updatedSentItemsUpdate(): void
+    {
+        Setting::set('sent_items_update', $this->sent_items_update);
+        AuditEvent::log('settings_changed', ip: request()->ip(), details: ['sent_items_update' => $this->sent_items_update]);
+        session()->flash('ok', $this->sent_items_update
+            ? 'Postausgang-Aktualisierung eingeschaltet — gesendete Mails werden nachträglich durch die signierte Fassung ersetzt (benötigt Graph-Berechtigung Mail.ReadWrite).'
+            : 'Postausgang-Aktualisierung ausgeschaltet.');
     }
 
     public function updatedModuleEnabled(): void
