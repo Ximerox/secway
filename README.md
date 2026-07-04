@@ -6,8 +6,9 @@
 
 <p align="center">
   <strong>Secure mail gateway</strong> — transparent S/MIME encryption, signature verification,
-  certificate harvesting and a password-protected recipient portal as fallback.<br>
-  Built with Laravel &amp; Postfix. Designed as a self-hosted replacement for CipherMail.
+  certificate harvesting, server-side signature blocks and a password-protected recipient
+  portal as fallback.<br>
+  Self-hosted, built with Laravel &amp; Postfix.
 </p>
 
 ---
@@ -25,10 +26,13 @@ searchable and archivable in your users' mailboxes.
 
 ```mermaid
 flowchart LR
+    ENTRA[(Entra ID)] -. hourly user sync .-> GW
     EXO[Mail system<br>e.g. Exchange Online] -->|transport rule<br>+ auth header| GW{SecWay}
-    GW -->|"recipient has a certificate"| SMIME[S/MIME encrypt<br>+ optional signature]
-    GW -->|"subject tagged, no certificate"| PORTAL[Encrypted portal storage<br>link mail + delayed password mail]
-    GW -->|otherwise| PASS[Pass through unchanged]
+    GW --> SIG[Signature block<br>from Entra attributes<br><i>optional</i>]
+    SIG --> ROUTE{Route per recipient}
+    ROUTE -->|"recipient has a certificate"| SMIME[S/MIME encrypt<br>+ optional signing]
+    ROUTE -->|"subject tagged, no certificate"| PORTAL[Encrypted portal storage<br>link mail + delayed password mail]
+    ROUTE -->|otherwise| PASS[Pass through unchanged]
     SMIME --> OUT[Delivery]
     PASS --> OUT
 ```
@@ -47,11 +51,12 @@ are verified (result recorded in an `X-MGW-Signature` header) and sender certifi
 **harvested** from trusted signatures — so the next reply to that sender is encrypted
 automatically and the encryption loop closes by itself.
 
-### Signature blocks (optional) — self-hosted CodeTwo alternative
+### Signature blocks (optional)
 
 An optional module appends a server-side **signature block** (the footer at the end of a mail)
 to outbound messages, filled per sender with attributes from **Entra ID** (Microsoft 365) via
-Microsoft Graph. WYSIWYG editor (self-hosted TinyMCE), placeholders with conditional blocks,
+Microsoft Graph. Users don't maintain their own footers — the gateway adds a consistent,
+central signature on the way out. WYSIWYG editor (self-hosted TinyMCE), placeholders with conditional blocks,
 inline images and **QR codes** (e.g. vCard) embedded per sender, and rules per block
 (sender/recipient include+exclude, internal/external direction, validity period, priority,
 continue-or-stop). Optionally it also **updates the sent copy** in the user's *Sent Items*
@@ -73,7 +78,7 @@ cryptographic S/MIME **signing** above.
 - **Fail-safe by design** — if encryption fails (e.g. expired certificate), the message goes
   to the portal instead of leaving in plaintext; missing auth header defers (TEMPFAIL) instead
   of dropping mail; everything the gateway sends is loop-protected via `X-MGW-Notification`
-- **CipherMail-compatible cryptography** — S/MIME sign-then-encrypt with AES-256-CBC content
+- **Standards-based S/MIME cryptography** — sign-then-encrypt with AES-256-CBC content
   encryption, RSA (PKCS#1 v1.5) key transport, SHA-256 RSA signatures; interoperates with
   common gateways and mail clients
 - **Signature-block module** (optional) — server-side e-mail footers from Entra ID with
