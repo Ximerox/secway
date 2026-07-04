@@ -23,8 +23,30 @@ class EntraSync extends Command
             return self::FAILURE;
         }
 
+        $groupIds = preg_split('/[\s,]+/', (string) Setting::get('entra_sync_groups', ''), -1, PREG_SPLIT_NO_EMPTY);
+        $enabledOnly = Setting::getBool('entra_sync_enabled_only', true);
+        $excludes = preg_split('/[\s,]+/', (string) Setting::get('entra_sync_exclude', 'HealthMailbox*, DiscoverySearchMailbox*'), -1, PREG_SPLIT_NO_EMPTY);
+
         try {
-            $all = $graph->users();
+            if ($groupIds !== []) {
+                // Gruppenmodus: Vereinigung der (transitiven) Benutzer-Mitglieder.
+                // Bewusst OHNE accountEnabled-Filter — freigegebene Postfächer sind
+                // technisch deaktivierte Konten; die Gruppen definieren den Umfang.
+                $all = [];
+                foreach ($groupIds as $gid) {
+                    foreach ($graph->groupMembers($gid) as $u) {
+                        $all[$u['id']] = $u;
+                    }
+                }
+                $all = array_values($all);
+                $mode = count($groupIds).' Gruppe(n)';
+            } else {
+                $all = $graph->users();
+                if ($enabledOnly) {
+                    $all = array_values(array_filter($all, fn ($u) => ! empty($u['accountEnabled'])));
+                }
+                $mode = 'alle Benutzer'.($enabledOnly ? ' (nur aktivierte)' : '');
+            }
         } catch (Throwable $e) {
             Log::error('entra:sync: Abruf fehlgeschlagen: '.$e->getMessage());
             $this->error('Abruf fehlgeschlagen: '.$e->getMessage());
@@ -32,7 +54,25 @@ class EntraSync extends Command
             return self::FAILURE;
         }
 
-        // Nur echte Postfach-Konten (mit Mailadresse) — Geräte-/Servicekonten fallen raus.
+        $fetched = count($all);
+
+        // Ausschlussmuster (Wildcards, case-insensitiv) gegen UPN und Mail
+        if ($excludes !== []) {
+            $all = array_values(array_filter($all, function ($u) use ($excludes) {
+                foreach ($excludes as $pattern) {
+                    foreach ([$u['userPrincipalName'] ?? '', $u['mail'] ?? ''] as $value) {
+                        if ($value !== '' && fnmatch(strtolower($pattern), strtolower($value))) {
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
+            }));
+        }
+        $excluded = $fetched - count($all);
+
+        // Nur Konten mit Mailadresse — ohne Adresse gibt es keinen Absender.
         $withMail = array_values(array_filter($all, fn ($u) => ! empty($u['mail'])));
 
         $seen = [];
@@ -66,7 +106,8 @@ class EntraSync extends Command
             $seen[] = $u['id'];
         }
 
-        // Entfernte Konten aufräumen — aber nie alles löschen, wenn Graph leer liefert.
+        // Nicht mehr im Umfang enthaltene Konten aufräumen — aber nie alles
+        // löschen, wenn Graph nichts liefert (Schutz vor Fehlkonfiguration).
         $deleted = 0;
         if (count($seen) > 0) {
             $deleted = EntraUser::whereNotIn('entra_id', $seen)->delete();
@@ -75,8 +116,8 @@ class EntraSync extends Command
         Setting::set('entra_last_sync', now()->toDateTimeString());
 
         $this->info(sprintf(
-            '%d Benutzer synchronisiert (%d neu, %d aktualisiert, %d entfernt; %d ohne Mailadresse übersprungen).',
-            count($seen), $created, $updated, $deleted, count($all) - count($withMail)
+            'Quelle %s: %d Benutzer synchronisiert (%d neu, %d aktualisiert, %d entfernt; %d per Muster ausgeschlossen, %d ohne Mailadresse übersprungen).',
+            $mode, count($seen), $created, $updated, $deleted, $excluded, count($all) - count($withMail)
         ));
 
         return self::SUCCESS;

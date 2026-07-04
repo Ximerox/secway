@@ -8,7 +8,8 @@ use RuntimeException;
 
 /**
  * Minimaler Microsoft-Graph-Client (Client-Credentials-Flow).
- * Berechtigung: User.Read.All (Application). Zugangsdaten in config/mailgateway.php (graph.*).
+ * Berechtigungen: User.Read.All, für Gruppenfilter zusätzlich GroupMember.Read.All
+ * (jeweils Application). Zugangsdaten in config/mailgateway.php (graph.*).
  */
 class GraphClient
 {
@@ -27,19 +28,38 @@ class GraphClient
     /** Alle Benutzer des Tenants (folgt der Graph-Paginierung). */
     public function users(): array
     {
-        $users = [];
-        $url = 'https://graph.microsoft.com/v1.0/users?$select='.self::USER_FIELDS.'&$top=999';
+        return $this->fetchAll(
+            'https://graph.microsoft.com/v1.0/users?$select='.self::USER_FIELDS.'&$top=999'
+        );
+    }
+
+    /**
+     * Benutzer-Mitglieder einer Gruppe, inkl. verschachtelter Gruppen (transitiv).
+     * Nicht-Benutzer-Objekte (Geräte, Untergruppen selbst) filtert der OData-Cast weg.
+     */
+    public function groupMembers(string $groupId): array
+    {
+        return $this->fetchAll(
+            'https://graph.microsoft.com/v1.0/groups/'.$groupId
+            .'/transitiveMembers/microsoft.graph.user?$select='.self::USER_FIELDS.'&$top=999'
+        );
+    }
+
+    /** Seitenweiser Abruf einer Graph-Collection. */
+    protected function fetchAll(string $url): array
+    {
+        $items = [];
 
         while ($url) {
             $resp = Http::withToken($this->token())->timeout(60)->get($url);
             if (! $resp->successful()) {
-                throw new RuntimeException('Graph /users fehlgeschlagen ('.$resp->status().'): '.substr($resp->body(), 0, 500));
+                throw new RuntimeException('Graph-Abruf fehlgeschlagen ('.$resp->status().'): '.substr($resp->body(), 0, 500));
             }
-            $users = array_merge($users, $resp->json('value') ?? []);
+            $items = array_merge($items, $resp->json('value') ?? []);
             $url = $resp->json('@odata.nextLink');
         }
 
-        return $users;
+        return $items;
     }
 
     /** OAuth2-Token, gecacht bis kurz vor Ablauf (Graph-Token gelten ~60-90 Min). */

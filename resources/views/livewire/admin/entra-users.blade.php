@@ -28,6 +28,37 @@
     </div>
 
     <div class="card">
+        <h2 style="margin-top:0;">Synchronisations-Filter</h2>
+        <form wire:submit="saveFilter">
+            <div>
+                <label>Entra-Gruppen (Objekt-IDs, kommagetrennt) — leer = alle Benutzer des Tenants</label>
+                <input type="text" wire:model="sync_groups" placeholder="z.B. aae8b795-10f6-4478-b3c0-736ae20d85c5, dc81d1c9-…" style="width:100%;">
+                @error('sync_groups')<div class="error">{{ $message }}</div>@enderror
+                <div class="muted" style="margin-top:4px;">
+                    Bei Gruppenfilter werden die Mitglieder (auch verschachtelt) unverändert übernommen — inklusive
+                    freigegebener Postfächer, die technisch deaktivierte Konten sind. Benötigt die
+                    Graph-Berechtigung <code>GroupMember.Read.All</code>.
+                </div>
+            </div>
+            <div class="grid2" style="margin-top:10px;">
+                <div>
+                    <label style="display:flex; gap:8px; align-items:center;">
+                        <input type="checkbox" wire:model="sync_enabled_only" style="width:auto;">
+                        Nur aktivierte Konten (wirkt nur ohne Gruppenfilter)
+                    </label>
+                </div>
+                <div>
+                    <label>Ausschlussmuster (Wildcards, gegen UPN und E-Mail)</label>
+                    <input type="text" wire:model="sync_exclude" placeholder="HealthMailbox*, DiscoverySearchMailbox*">
+                    @error('sync_exclude')<div class="error">{{ $message }}</div>@enderror
+                </div>
+            </div>
+            <button type="submit" class="btn" style="margin-top:10px;" wire:loading.attr="disabled">Speichern &amp; synchronisieren</button>
+            <span class="muted" wire:loading wire:target="saveFilter">läuft …</span>
+        </form>
+    </div>
+
+    <div class="card">
         <input type="text" wire:model.live.debounce.400ms="q" placeholder="Suche: Name, E-Mail, Abteilung, Position …" style="max-width:420px;">
         <table style="margin-top:12px;">
             <thead><tr><th>Name</th><th>E-Mail</th><th>Position</th><th>Abteilung</th><th>Telefon</th><th>Mobil</th><th>Status</th></tr></thead>
