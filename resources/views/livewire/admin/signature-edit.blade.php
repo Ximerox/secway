@@ -287,7 +287,7 @@
                 plugins: 'table image link code lists',
                 toolbar: 'undo redo | fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | bullist numlist | table image link | platzhalter | code',
                 menubar: false,
-                height: 340,
+                height: 460,
                 convert_urls: false,
                 branding: false,
                 promotion: false,

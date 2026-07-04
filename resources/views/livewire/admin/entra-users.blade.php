@@ -82,6 +82,6 @@
             @endforelse
             </tbody>
         </table>
-        {{ $users->links() }}
+        <div style="margin-top:14px;">{{ $users->links('pagination') }}</div>
     </div>
 </div>
