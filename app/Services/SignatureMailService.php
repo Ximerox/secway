@@ -158,6 +158,11 @@ class SignatureMailService
             $out = $this->attachInlineImages($out, $newImages);
         }
 
+        // Einheitliche CRLF-Zeilenenden — die MIME-Bearbeitung (zbateson +
+        // eigene String-Operationen) erzeugt sonst gemischte LF/CRLF, was beim
+        // Wieder-Einspeisen (v.a. passThrough) zu fehlerhaften Mails führt.
+        $out = preg_replace('/\r\n|\r|\n/', "\r\n", $out);
+
         return [
             'raw' => $out,
             'applied' => $templates->pluck('name')->all(),

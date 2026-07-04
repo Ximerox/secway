@@ -117,7 +117,10 @@ class SmimeMailService
         }
         $keep[] = 'X-MGW-Notification: yes';
 
-        RawMail::submit(implode("\n", $keep)."\n\n".$body, $sender, $recipients);
+        // CRLF-normalisiert einspeisen (SMTP-konform; verhindert fehlerhafte
+        // Mails, falls der Body gemischte Zeilenenden enthält)
+        $message = preg_replace('/\r\n|\r|\n/', "\r\n", implode("\n", $keep)."\n\n".$body);
+        RawMail::submit($message, $sender, $recipients);
     }
 
     /** Innere Entität: Content-Header der Originalmail + Body. */
