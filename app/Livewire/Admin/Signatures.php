@@ -219,10 +219,34 @@ class Signatures extends Component
             'priority' => $t->priority, 'direction' => $t->direction, 'sender_mode' => $t->sender_mode,
         ]);
 
-        $hint = $this->sender_mode === 'group'
-            ? ' Hinweis: Gruppen-Mitgliedschaften werden beim nächsten Entra-Sync aufgelöst (oder jetzt manuell auf der Benutzer-Seite synchronisieren).'
-            : '';
+        $hint = '';
+        if ($t->sender_mode === 'group' && $t->sender_group_id) {
+            $hint = $this->resolveGroupMembers($t->sender_group_id)
+                ? ' Gruppen-Mitgliedschaften wurden aufgelöst.'
+                : ' Achtung: Gruppen-Mitglieder konnten nicht sofort aufgelöst werden — spätestens der stündliche Entra-Sync holt das nach.';
+        }
         session()->flash('ok', 'Vorlage „'.$t->name.'" gespeichert.'.$hint);
+    }
+
+    /** Löst die Mitglieder einer Regel-Gruppe sofort in entra_users.group_ids auf. */
+    protected function resolveGroupMembers(string $groupId): bool
+    {
+        try {
+            $memberIds = app(GraphClient::class)->groupMemberIds($groupId);
+            foreach (EntraUser::all() as $u) {
+                $has = in_array($groupId, $u->group_ids ?? [], true);
+                $is = in_array($u->entra_id, $memberIds, true);
+                if ($is && ! $has) {
+                    $u->update(['group_ids' => array_values(array_merge($u->group_ids ?? [], [$groupId]))]);
+                } elseif (! $is && $has) {
+                    $u->update(['group_ids' => array_values(array_diff($u->group_ids ?? [], [$groupId]))]);
+                }
+            }
+
+            return true;
+        } catch (Throwable $e) {
+            return false;
+        }
     }
 
     public function delete(int $id): void
