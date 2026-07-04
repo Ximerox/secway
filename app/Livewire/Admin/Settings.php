@@ -58,8 +58,8 @@ class Settings extends Component
             'legal_impressum' => 'nullable|string|max:60000',
             'legal_datenschutz' => 'nullable|string|max:60000',
         ], [
-            'internal_domains.required' => 'Mindestens eine interne Domain wird benötigt (z.B. straphael.de).',
-            'internal_domains.regex' => 'Bitte Domains kommagetrennt angeben, z.B.: straphael.de, zweite-domain.de',
+            'internal_domains.required' => 'Mindestens eine interne Domain wird benötigt (z.B. example.org).',
+            'internal_domains.regex' => 'Bitte Domains kommagetrennt angeben, z.B.: example.org, zweite-domain.de',
             'subject_tag.required' => 'Das Tag darf nicht leer sein — sonst gäbe es keinen Portal-Auslöser mehr.',
             'subject_tag.min' => 'Das Tag sollte mindestens 2 Zeichen haben, um Fehlauslösungen zu vermeiden.',
             'retention_days.min' => 'Mindestens 1 Tag.',
