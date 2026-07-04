@@ -167,15 +167,6 @@ class MailIngest extends Command
         $hasTag = SubjectTag::contains((string) $parsed->getSubject());
         $autoEncrypt = Setting::getBool('smime_auto', true);
 
-        // Nur echte S/MIME-Mail gehört in den Eingangs-Pfad (entschlüsseln/prüfen/
-        // ernten). Interne Mail (interner Absender an interne Empfänger, über die
-        // Interne-Mail-Transportregel) ist keine S/MIME-Mail und wird — inkl. ggf.
-        // angehängtem Signaturblock — neutral durchgeleitet, nicht "eingehend"
-        // verarbeitet. Die Unterscheidung über den Nachrichtentyp ist robuster als
-        // über die Absenderdomain (z.B. sendet der Exchange-Kalenderassistent aus
-        // der onmicrosoft.com-Tenant-Domain, die nicht in internal_domains steht).
-        $isSmime = self::isSmimeMessage($parsed);
-
         $inboundRcpts = [];
         $smime = [];
         $portalRcpts = [];
@@ -186,13 +177,9 @@ class MailIngest extends Command
 
                 continue;
             }
-            // Interner Empfänger: S/MIME → Eingangs-Pfad, sonst interne Mail → durchleiten
+            // Empfänger in interner Domain = eingehende Mail (entschlüsseln/prüfen/ernten)
             if (InternalDomains::isInternal($rcpt)) {
-                if ($isSmime) {
-                    $inboundRcpts[] = $rcpt;
-                } else {
-                    $passRcpts[] = $rcpt;
-                }
+                $inboundRcpts[] = $rcpt;
 
                 continue;
             }
@@ -367,24 +354,6 @@ class MailIngest extends Command
     private function cleanSubject(string $subject): string
     {
         return SubjectTag::strip($subject);
-    }
-
-    /** Erkennt S/MIME-Nachrichten — direkt oder in einer multipart/mixed-Hülle verpackt. */
-    public static function isSmimeMessage(Message $m): bool
-    {
-        $ct = strtolower((string) $m->getContentType());
-        if (str_contains($ct, 'pkcs7') || str_contains($ct, 'multipart/signed')) {
-            return true;
-        }
-        foreach ($m->getAllParts() as $part) {
-            $pct = strtolower((string) $part->getContentType());
-            $fn = strtolower((string) $part->getFilename());
-            if (str_contains($pct, 'pkcs7') || str_ends_with($fn, '.p7m') || str_ends_with($fn, '.p7s')) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function generatePassword(): string
