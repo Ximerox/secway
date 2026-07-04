@@ -216,10 +216,41 @@ php artisan entra:sync        # first user import; afterwards hourly via the sch
 groups, e.g. a dynamic group scoped to your user OU), then create signature blocks under
 Admin → Signaturblöcke and switch the module on.
 
-No extra Exchange rule is required: signature blocks are applied to outbound mail that already
-flows through the gateway via the "route through SecWay" rule from section 6. (Signing *internal*
-mail — where sender and recipient are both internal — would need the routing rule widened to
-internal recipients; that is on the roadmap and not covered here.)
+For **outbound external** mail no extra Exchange rule is required: signature blocks are applied
+to mail that already flows through the gateway via the "route through SecWay" rule from
+section 6.
+
+### Signature blocks on internal mail (optional)
+
+To also sign **internal** mail (sender and recipient both inside the organization), two extra
+steps are required:
+
+**1. Additional transport rule** "internal mail through SecWay":
+
+- **Condition:** *Is received from 'Inside the organization'*
+- **Actions:** set header `X-MGW-Auth` = value of `MGW_INGEST_SECRET`, route via the outbound
+  connector (optionally *Stop processing more rules*)
+- **Exceptions** (all three matter):
+  - *Is message type 'Calendaring'* — **essential**: meeting requests and room bookings rely on
+    Exchange's native calendar processing; routing them through the gateway breaks room booking.
+  - Header `Return-Path` contains `<>` — keeps bounces/system mail out.
+  - Header `X-MGW-Notification` contains `yes` — loop protection.
+
+The gateway detects internal non-S/MIME mail and passes it through unchanged apart from the
+signature block (it does **not** go through the S/MIME inbound path).
+
+**2. Disable TNEF for outbound SMTP** (Exchange Online PowerShell) — **mandatory**:
+
+```powershell
+Set-RemoteDomain -Identity Default -TNEFEnabled $false
+```
+
+Without this, Outlook/Exchange encodes mail to internal mailbox recipients as TNEF
+(`winmail.dat`) when routing it out through the connector. The HTML body is then locked inside
+the TNEF blob: the gateway cannot insert the signature block, recipients get the footer-less
+original, and the Sent-Items copy degrades to plain text + `winmail.dat`. Disabling TNEF forces
+clean MIME/HTML on the connector (and as a bonus stops `winmail.dat` ever reaching external
+recipients).
 
 ## 8. Cron & operations scripts
 

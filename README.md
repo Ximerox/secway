@@ -60,9 +60,11 @@ central signature on the way out. WYSIWYG editor (self-hosted TinyMCE), placehol
 inline images and **QR codes** (e.g. vCard) embedded per sender, and rules per block
 (sender/recipient include+exclude, internal/external direction, validity period, priority,
 continue-or-stop). Optionally it also **updates the sent copy** in the user's *Sent Items*
-folder with the signed version. Disabled by default; needs no extra Exchange rule (it runs on
-mail already routed through the gateway). "Signature block" is deliberately distinct from the
-cryptographic S/MIME **signing** above.
+folder with the signed version. Disabled by default. Outbound external mail needs no extra
+Exchange rule (it runs on mail already routed through the gateway); **internal mail** works too
+with one additional transport rule and TNEF disabled (see INSTALL — calendaring is excluded so
+room booking keeps working). "Signature block" is deliberately distinct from the cryptographic
+S/MIME **signing** above.
 
 ## Features
 
@@ -148,9 +150,9 @@ portal passwords are stored as bcrypt hashes only. Every action is written to an
 
 ## Status & roadmap
 
-In production at a German non-profit since 2026, including the signature-block module.
-Roadmap: signing internal-to-internal mail (needs the routing rule widened to internal
-recipients), reply-from-portal for external recipients, optional AES-GCM/OAEP cipher profile.
+In production at a German non-profit since 2026, including the signature-block module for
+external and internal mail. Roadmap: reply-from-portal for external recipients, optional
+AES-GCM/OAEP cipher profile.
 
 ## License
 

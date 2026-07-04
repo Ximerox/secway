@@ -101,3 +101,11 @@ Betriebssystem-Sicherheitsupdates installiert `unattended-upgrades` automatisch;
   Kalender notieren!). Neues Secret in Entra erzeugen, in `.env` (`GRAPH_CLIENT_SECRET`)
   eintragen, dann `php artisan config:cache`. Symptom bei abgelaufenem Secret: Sync/QR schlagen
   fehl, Protokoll zeigt Graph-Fehler.
+- **Signaturblock fehlt bei internen Mails / `winmail.dat` im Gesendet-Ordner:** Klassisches
+  TNEF-Symptom — Outlook verpackt Mails an interne Postfächer als Rich-Text, der HTML-Body
+  steckt dann unzugänglich in der `winmail.dat`. Prüfen/Fix (Exchange Online PowerShell):
+  `Set-RemoteDomain -Identity Default -TNEFEnabled $false` (siehe INSTALL, Abschnitt
+  Signaturblöcke intern).
+- **Raumbuchung/Termine funktionieren nicht:** Die interne Transportregel muss die Ausnahme
+  *„Is message type 'Calendaring'"* haben — Kalendernachrichten dürfen nie über das Gateway
+  geroutet werden.
