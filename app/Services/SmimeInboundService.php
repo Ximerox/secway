@@ -2,11 +2,15 @@
 
 namespace App\Services;
 
+use App\Mail\HeldMailNotification;
 use App\Models\AuditEvent;
+use App\Models\HeldMessage;
 use App\Models\Setting;
 use App\Models\SmimeCertificate;
 use App\Support\RawMail;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 use ZBateson\MailMimeParser\Message;
 
@@ -23,7 +27,7 @@ use ZBateson\MailMimeParser\Message;
 class SmimeInboundService
 {
     /** @return string[] Status-Schritte (für Audit/Header) */
-    public function process(string $raw, string $sender, array $recipients): array
+    public function process(string $raw, string $sender, array $recipients, bool $allowHold = true): array
     {
         $tmpDir = sys_get_temp_dir().'/mgw-in-'.bin2hex(random_bytes(8));
         if (! mkdir($tmpDir, 0700)) {
@@ -31,14 +35,101 @@ class SmimeInboundService
         }
 
         try {
-            return $this->doProcess($raw, $sender, $recipients, $tmpDir);
+            return $this->doProcess($raw, $sender, $recipients, $tmpDir, $allowHold);
         } finally {
             array_map('unlink', glob($tmpDir.'/*') ?: []);
             @rmdir($tmpDir);
         }
     }
 
-    private function doProcess(string $raw, string $sender, array $recipients, string $tmpDir): array
+    /**
+     * Versucht eine zurückgehaltene Mail erneut zu verarbeiten.
+     * Erfolgreiche Entschlüsselung → normale Zustellung + Freigabe.
+     * $deliverAnyway → auch ohne Schlüssel unverändert zustellen (Frist/Handfreigabe).
+     *
+     * @return bool true, wenn die Mail zugestellt und freigegeben wurde
+     */
+    public function retryHeld(HeldMessage $held, bool $deliverAnyway = false, string $actionIfUndeciphered = 'as_is'): bool
+    {
+        $raw = $held->rawContent();
+
+        if (! $this->probeDecrypt($raw) && ! $deliverAnyway) {
+            $held->increment('retry_count');
+
+            return false;
+        }
+
+        // allowHold=false: darf beim erneuten Scheitern nicht wieder einlagern
+        $status = $this->process($raw, $held->sender, $held->recipients, allowHold: false);
+        $decrypted = (bool) array_filter($status, fn ($s) => str_starts_with($s, 'decrypted') || str_starts_with($s, 'unwrapped_decrypted'));
+        $held->release($decrypted ? 'decrypted' : $actionIfUndeciphered);
+
+        AuditEvent::log('held_released', details: [
+            'sender' => $held->sender,
+            'recipients' => $held->recipients,
+            'subject' => $held->subject,
+            'action' => $held->release_action,
+            'status' => $status,
+        ]);
+
+        return true;
+    }
+
+    /** Lagert die Mail in die Quarantäne ein und benachrichtigt den Admin. */
+    private function holdMessage(string $raw, string $sender, array $recipients, string $topHeaders, string $diagnosis): void
+    {
+        // findHeader liefert die komplette Zeile inkl. "Subject:" — Präfix abschneiden
+        $subject = RawMail::findHeader($topHeaders, 'subject');
+        if ($subject !== null) {
+            $subject = trim(preg_replace('/^subject\s*:\s*/i', '', $subject));
+            $decoded = @iconv_mime_decode($subject, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+            $subject = trim($decoded !== false ? $decoded : $subject);
+        }
+
+        $held = HeldMessage::hold($raw, $sender, $recipients, $subject, ltrim($diagnosis));
+
+        AuditEvent::log('inbound_held', details: [
+            'sender' => $sender,
+            'recipients' => $recipients,
+            'subject' => $held->subject,
+            'diagnosis' => $held->diagnosis,
+            'hold_until' => $held->hold_until->format('d.m.Y H:i'),
+        ]);
+
+        // Die Benachrichtigung darf das Einlagern nie scheitern lassen.
+        $notify = (string) Setting::get('admin_notify_email', config('mailgateway.admin_notify_email'));
+        if ($notify !== '') {
+            try {
+                Mail::to($notify)->send(new HeldMailNotification($held));
+            } catch (\Throwable $e) {
+                Log::error('Quarantäne-Benachrichtigung fehlgeschlagen', ['error' => $e->getMessage()]);
+            }
+        }
+    }
+
+    /** Prüft ohne Zustellung, ob die Mail inzwischen entschlüsselbar ist. */
+    private function probeDecrypt(string $raw): bool
+    {
+        $tmpDir = sys_get_temp_dir().'/mgw-probe-'.bin2hex(random_bytes(8));
+        if (! mkdir($tmpDir, 0700)) {
+            throw new RuntimeException('Temp-Verzeichnis konnte nicht angelegt werden.');
+        }
+
+        try {
+            [$topHeaders] = RawMail::split($raw);
+            [$kind, $smimeFile] = $this->locateSmime($raw, $topHeaders, $tmpDir);
+            if ($kind !== 'encrypted' && $kind !== 'encrypted-wrapped') {
+                return true; // nicht (mehr) verschlüsselt — normal verarbeitbar
+            }
+
+            return $this->tryDecrypt($smimeFile, $tmpDir.'/probe-out.eml', $tmpDir);
+        } finally {
+            array_map('unlink', glob($tmpDir.'/*') ?: []);
+            @rmdir($tmpDir);
+        }
+    }
+
+    private function doProcess(string $raw, string $sender, array $recipients, string $tmpDir, bool $allowHold = true): array
     {
         // Debug-Mitschrift (Admin-Setting debug_inbound), zur Analyse von Verpackungsvarianten
         if (Setting::getBool('debug_inbound', false)) {
@@ -73,8 +164,17 @@ class SmimeInboundService
                     }
                 }
             } else {
-                // Kein passender Schlüssel: unverändert zustellen statt Mail zu verlieren
-                $status[] = 'decrypt_failed'.$this->describeRecipientInfos($smimeFile);
+                $diagnosis = $this->describeRecipientInfos($smimeFile);
+
+                // Quarantäne (optional): zurückhalten, Admin benachrichtigen, Zertifikat
+                // kann nachgereicht werden. Sonst: unverändert zustellen statt verlieren.
+                if ($allowHold && Setting::getBool('inbound_hold_enabled', (bool) config('mailgateway.inbound_hold_enabled'))) {
+                    $this->holdMessage($raw, $sender, $recipients, $topHeaders, $diagnosis);
+
+                    return ['held'.$diagnosis];
+                }
+
+                $status[] = 'decrypt_failed'.$diagnosis;
             }
         }
         // 2b) Nur signiert (direkt oder ausgepackt)

@@ -14,6 +14,9 @@ class AuditEvent extends Model
     private const DIRECTIONS = [
         'inbound_processed' => 'eingehend',
         'cert_harvested' => 'eingehend',
+        'inbound_held' => 'eingehend',
+        'held_released' => 'eingehend',
+        'held_deleted' => 'System',
         'smime_sent' => 'ausgehend',
         'smime_fallback' => 'ausgehend',
         'signature_applied' => 'ausgehend',

@@ -34,6 +34,16 @@ return [
     // gelten als eingehende Mail (Entschlüsselung/Signaturprüfung/Ernten)
     'internal_domains' => env('MGW_INTERNAL_DOMAINS', ''),
 
+    // Quarantäne für eingehende S/MIME-Mails ohne passenden eigenen Schlüssel:
+    // zurückhalten + Admin benachrichtigen statt verschlüsselt zuzustellen.
+    // Nach Ablauf der Frist wird unverändert zugestellt (nichts bleibt liegen).
+    'inbound_hold_enabled' => env('MGW_INBOUND_HOLD_ENABLED', false),
+    'inbound_hold_hours' => env('MGW_INBOUND_HOLD_HOURS', 72),
+
+    // Empfänger für Anwendungs-Benachrichtigungen (z. B. Quarantäne).
+    // Betriebsalarme der Ops-Skripte nutzen weiterhin ALERT_TO in /etc/secway.conf.
+    'admin_notify_email' => env('MGW_ADMIN_NOTIFY', ''),
+
     // Geheimnis, das die EXO-Transportregel als Header setzen muss.
     // Ohne gültigen Header wird eingehende Post abgewiesen (Bounce an Absender).
     'secret_header' => 'X-MGW-Auth',

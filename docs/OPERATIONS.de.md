@@ -96,6 +96,12 @@ Betriebssystem-Sicherheitsupdates installiert `unattended-upgrades` automatisch;
   `systemctl status clamav-daemon`, Test: `runuser -u www-data -- clamdscan --fdpass /etc/hostname`.
   Abgelehnte Anhänge stehen mit Signaturnamen im Protokoll (`reply_rejected`). Es wird nie
   ungeprüft zugestellt.
+- **Zurückgehaltene eingehende Mail (Quarantäne):** Benachrichtigung nennt das benötigte
+  Zertifikat (Aussteller/Seriennummer). Zertifikat unter Admin → Zertifikate importieren
+  (Typ *eigenes*, mit privatem Schlüssel) — die Mail wird innerhalb von 15 Minuten automatisch
+  entschlüsselt und zugestellt (oder sofort: Admin → Zurückgehalten → *Erneut entschlüsseln*).
+  Nach Fristablauf wird automatisch unverändert (verschlüsselt) zugestellt. Ein-/ausschalten:
+  Admin → Einstellungen → *Eingehende S/MIME-Quarantäne*.
 - **Impressum/Datenschutz ändern:** Admin → Einstellungen → HTML-Felder unten.
 - **Eigenes Kennwort / Benutzername ändern:** Admin → Konto.
 - **Weiteren Admin-Benutzer anlegen:** per Tinker (siehe INSTALL.md, „First admin user").

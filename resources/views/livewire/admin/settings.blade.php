@@ -66,6 +66,33 @@
         </div>
 
         <div class="card">
+            <h2 style="margin-top:0;">Eingehende S/MIME-Quarantäne</h2>
+
+            <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;cursor:pointer;">
+                <input type="checkbox" wire:model="inbound_hold_enabled" style="margin-top:3px;">
+                <span>
+                    <strong>Unentschlüsselbare eingehende Mails zurückhalten</strong><br>
+                    <span class="muted">Kann eine eingehende S/MIME-Mail mit keinem der eigenen Zertifikate entschlüsselt werden, wird sie zurückgehalten statt verschlüsselt zugestellt. Die Benachrichtigungsadresse (unten) erhält eine Meldung mit Angabe des benötigten Zertifikats; nach dem Import wird automatisch entschlüsselt und zugestellt. Wenn deaktiviert: sofortige Zustellung der verschlüsselten Original-Mail (bisheriges Verhalten).</span>
+                </span>
+            </label>
+
+            <div class="grid2" style="margin-top:14px;">
+                <div>
+                    <label>Zurückhalten für höchstens (Stunden)</label>
+                    <input type="text" wire:model="inbound_hold_hours" style="max-width:120px;">
+                    @error('inbound_hold_hours')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">Nach Ablauf wird die Mail automatisch unverändert (verschlüsselt) zugestellt — es bleibt nie etwas dauerhaft liegen.</p>
+                </div>
+                <div>
+                    <label>Benachrichtigungsadresse</label>
+                    <input type="text" wire:model="admin_notify_email" placeholder="admin@example.org" style="max-width:320px;">
+                    @error('admin_notify_email')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">Empfänger der Quarantäne-Meldungen (leer = keine Benachrichtigung, nur Protokoll-Eintrag). Betriebsalarme der Serverskripte nutzen weiterhin <code>ALERT_TO</code> in <code>/etc/secway.conf</code>.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
             <h2 style="margin-top:0;">Portal-Antworten</h2>
 
             <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;cursor:pointer;">

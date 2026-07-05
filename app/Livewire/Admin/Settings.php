@@ -30,6 +30,12 @@ class Settings extends Component
 
     public int $reply_max_per_message = 5;
 
+    public bool $inbound_hold_enabled = false;
+
+    public int $inbound_hold_hours = 72;
+
+    public string $admin_notify_email = '';
+
     public string $internal_domains = '';
 
     public string $operator_name = '';
@@ -49,6 +55,9 @@ class Settings extends Component
         $this->reply_enabled = Setting::getBool('reply_enabled', (bool) config('mailgateway.reply_enabled'));
         $this->reply_max_size_mb = (int) Setting::get('reply_max_size_mb', config('mailgateway.reply_max_size_mb'));
         $this->reply_max_per_message = (int) Setting::get('reply_max_per_message', config('mailgateway.reply_max_per_message'));
+        $this->inbound_hold_enabled = Setting::getBool('inbound_hold_enabled', (bool) config('mailgateway.inbound_hold_enabled'));
+        $this->inbound_hold_hours = (int) Setting::get('inbound_hold_hours', config('mailgateway.inbound_hold_hours'));
+        $this->admin_notify_email = (string) Setting::get('admin_notify_email', config('mailgateway.admin_notify_email'));
         $this->internal_domains = (string) Setting::get('internal_domains', config('mailgateway.internal_domains'));
         $this->operator_name = Setting::operator();
         $this->legal_impressum = (string) Setting::get('legal_impressum', '');
@@ -64,6 +73,8 @@ class Settings extends Component
             'reminder_after_hours' => 'required|integer|min:0|max:2160',
             'reply_max_size_mb' => 'required|integer|min:1|max:50',
             'reply_max_per_message' => 'required|integer|min:1|max:50',
+            'inbound_hold_hours' => 'required|integer|min:1|max:720',
+            'admin_notify_email' => 'nullable|email',
             'internal_domains' => ['required', 'regex:/^[a-z0-9.-]+(\s*,\s*[a-z0-9.-]+)*$/i'],
             'operator_name' => 'required|string|min:2|max:100',
             'legal_impressum' => 'nullable|string|max:60000',
@@ -86,6 +97,9 @@ class Settings extends Component
         Setting::set('reply_enabled', $this->reply_enabled);
         Setting::set('reply_max_size_mb', $this->reply_max_size_mb);
         Setting::set('reply_max_per_message', $this->reply_max_per_message);
+        Setting::set('inbound_hold_enabled', $this->inbound_hold_enabled);
+        Setting::set('inbound_hold_hours', $this->inbound_hold_hours);
+        Setting::set('admin_notify_email', trim($this->admin_notify_email));
         Setting::set('internal_domains', strtolower(trim($this->internal_domains)));
         Setting::set('operator_name', trim($this->operator_name));
         Setting::set('legal_impressum', trim($this->legal_impressum));
@@ -101,6 +115,9 @@ class Settings extends Component
             'reply_enabled' => $this->reply_enabled,
             'reply_max_size_mb' => $this->reply_max_size_mb,
             'reply_max_per_message' => $this->reply_max_per_message,
+            'inbound_hold_enabled' => $this->inbound_hold_enabled,
+            'inbound_hold_hours' => $this->inbound_hold_hours,
+            'admin_notify_email' => trim($this->admin_notify_email),
             'internal_domains' => strtolower(trim($this->internal_domains)),
             'operator_name' => trim($this->operator_name),
         ]);

@@ -7,6 +7,7 @@ use App\Http\Controllers\SignatureQrController;
 use App\Livewire\Admin\Account;
 use App\Livewire\Admin\Certificates;
 use App\Livewire\Admin\EntraUsers;
+use App\Livewire\Admin\Held;
 use App\Livewire\Admin\SignatureEdit;
 use App\Livewire\Admin\Signatures;
 use App\Livewire\Admin\Log;
@@ -45,6 +46,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/protokoll', Log::class)->name('admin.log');
         Route::get('/statistik', Stats::class)->name('admin.stats');
         Route::get('/zertifikate', Certificates::class)->name('admin.certs');
+        Route::get('/zurueckgehalten', Held::class)->name('admin.held');
         Route::get('/signaturen', Signatures::class)->name('admin.signatures');
         Route::get('/signaturen/neu', SignatureEdit::class)->name('admin.signatures.new');
         Route::get('/signaturen/{template}/bearbeiten', SignatureEdit::class)->name('admin.signatures.edit');

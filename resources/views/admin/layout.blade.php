@@ -66,6 +66,11 @@
     <a href="{{ route('admin.queue') }}" @class(['active' => request()->routeIs('admin.queue')])>Warteschlange</a>
     <a href="{{ route('admin.log') }}" @class(['active' => request()->routeIs('admin.log')])>Protokoll</a>
     <a href="{{ route('admin.certs') }}" @class(['active' => request()->routeIs('admin.certs')])>Zertifikate</a>
+    @if (($heldCount = \App\Models\HeldMessage::where('status', 'held')->count()) > 0)
+        <a href="{{ route('admin.held') }}" @class(['active' => request()->routeIs('admin.held')])>Zurückgehalten ({{ $heldCount }})</a>
+    @elseif (request()->routeIs('admin.held') || \App\Models\Setting::getBool('inbound_hold_enabled', (bool) config('mailgateway.inbound_hold_enabled')))
+        <a href="{{ route('admin.held') }}" @class(['active' => request()->routeIs('admin.held')])>Zurückgehalten</a>
+    @endif
     <a href="{{ route('admin.signatures') }}" @class(['active' => request()->routeIs('admin.signatures*')])>Signaturblöcke</a>
     <a href="{{ route('admin.users') }}" @class(['active' => request()->routeIs('admin.users')])>Benutzer</a>
     <a href="{{ route('admin.settings') }}" @class(['active' => request()->routeIs('admin.settings')])>Einstellungen</a>

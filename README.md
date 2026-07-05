@@ -53,6 +53,11 @@ are verified (result recorded in an `X-MGW-Signature` header) and sender certifi
 **harvested** from trusted signatures — so the next reply to that sender is encrypted
 automatically and the encryption loop closes by itself.
 
+If no matching private key exists, the mail is delivered unchanged by default. Optionally a
+**quarantine** holds such mail instead: the admin is notified which certificate is missing
+(issuer/serial), can upload it and the mail is decrypted and delivered automatically —
+after a configurable deadline it is delivered as received, so nothing is ever stuck or lost.
+
 ### Signature blocks (optional)
 
 An optional module appends a server-side **signature block** (the footer at the end of a mail)
