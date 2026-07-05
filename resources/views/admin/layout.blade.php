@@ -13,6 +13,26 @@
     nav .brand { font-weight: 700; margin-right: 28px; font-size: 15.5px; }
     nav a { color: #dbe7f5; text-decoration: none; padding: 17px 14px; font-size: 14.5px; font-weight: 600; }
     nav a:hover, nav a.active { color: #fff; background: #163d6d; }
+    nav .grp { position: relative; height: 54px; display: flex; align-items: center; }
+    nav .grp > .trigger {
+        color: #dbe7f5; padding: 17px 14px; font-size: 14.5px; font-weight: 600;
+        cursor: default; user-select: none; white-space: nowrap;
+    }
+    nav .grp > .trigger .caret { font-size: 10px; opacity: .7; margin-left: 3px; }
+    nav .grp:hover > .trigger, nav .grp:focus-within > .trigger,
+    nav .grp > .trigger.active { color: #fff; background: #163d6d; }
+    nav .grp .menu {
+        display: none; position: absolute; top: 54px; left: 0; z-index: 50;
+        background: #163d6d; min-width: 210px; padding: 6px 0;
+        border-radius: 0 0 10px 10px; box-shadow: 0 10px 24px rgba(16,24,40,.25);
+    }
+    nav .grp:hover .menu, nav .grp:focus-within .menu { display: block; }
+    nav .grp .menu a { display: block; padding: 10px 18px; }
+    nav .grp .menu a:hover, nav .grp .menu a.active { background: #0f2f56; }
+    nav .navbadge {
+        background: #f59e0b; color: #fff; border-radius: 99px;
+        font-size: 11px; font-weight: 700; padding: 1px 7px; margin-left: 6px; vertical-align: 1px;
+    }
     nav form { margin-left: auto; }
     nav button { background: none; border: 0; color: #dbe7f5; font: inherit; font-weight: 600; cursor: pointer; padding: 10px 4px; }
     nav button:hover { color: #fff; }
@@ -61,20 +81,49 @@
         </svg>
         SecWay
     </span>
+    @php
+        $heldCount = \App\Models\HeldMessage::where('status', 'held')->count();
+        $showHeld = $heldCount > 0
+            || request()->routeIs('admin.held')
+            || \App\Models\Setting::getBool('inbound_hold_enabled', (bool) config('mailgateway.inbound_hold_enabled'));
+    @endphp
+
     <a href="{{ route('admin.stats') }}" @class(['active' => request()->routeIs('admin.stats')])>Statistik</a>
-    <a href="{{ route('admin.messages') }}" @class(['active' => request()->routeIs('admin.messages')])>Nachrichten</a>
-    <a href="{{ route('admin.queue') }}" @class(['active' => request()->routeIs('admin.queue')])>Warteschlange</a>
     <a href="{{ route('admin.log') }}" @class(['active' => request()->routeIs('admin.log')])>Protokoll</a>
-    <a href="{{ route('admin.certs') }}" @class(['active' => request()->routeIs('admin.certs')])>Zertifikate</a>
-    @if (($heldCount = \App\Models\HeldMessage::where('status', 'held')->count()) > 0)
-        <a href="{{ route('admin.held') }}" @class(['active' => request()->routeIs('admin.held')])>Zurückgehalten ({{ $heldCount }})</a>
-    @elseif (request()->routeIs('admin.held') || \App\Models\Setting::getBool('inbound_hold_enabled', (bool) config('mailgateway.inbound_hold_enabled')))
-        <a href="{{ route('admin.held') }}" @class(['active' => request()->routeIs('admin.held')])>Zurückgehalten</a>
-    @endif
-    <a href="{{ route('admin.signatures') }}" @class(['active' => request()->routeIs('admin.signatures*')])>Signaturblöcke</a>
-    <a href="{{ route('admin.users') }}" @class(['active' => request()->routeIs('admin.users')])>Benutzer</a>
-    <a href="{{ route('admin.settings') }}" @class(['active' => request()->routeIs('admin.settings')])>Einstellungen</a>
-    <a href="{{ route('admin.account') }}" @class(['active' => request()->routeIs('admin.account')])>Konto</a>
+
+    <div class="grp">
+        <span class="trigger @if(request()->routeIs('admin.messages', 'admin.held', 'admin.certs')) active @endif" tabindex="0">
+            Verschlüsselung{!! $heldCount > 0 ? '<span class="navbadge">'.$heldCount.'</span>' : '' !!}<span class="caret">▾</span>
+        </span>
+        <div class="menu">
+            <a href="{{ route('admin.messages') }}" @class(['active' => request()->routeIs('admin.messages')])>Portal-Nachrichten</a>
+            @if ($showHeld)
+                <a href="{{ route('admin.held') }}" @class(['active' => request()->routeIs('admin.held')])>Zurückgehalten{{ $heldCount > 0 ? ' ('.$heldCount.')' : '' }}</a>
+            @endif
+            <a href="{{ route('admin.certs') }}" @class(['active' => request()->routeIs('admin.certs')])>Zertifikate</a>
+        </div>
+    </div>
+
+    <div class="grp">
+        <span class="trigger @if(request()->routeIs('admin.signatures*', 'admin.users')) active @endif" tabindex="0">
+            Signaturen<span class="caret">▾</span>
+        </span>
+        <div class="menu">
+            <a href="{{ route('admin.signatures') }}" @class(['active' => request()->routeIs('admin.signatures*')])>Signaturblöcke</a>
+            <a href="{{ route('admin.users') }}" @class(['active' => request()->routeIs('admin.users')])>Entra-Benutzer</a>
+        </div>
+    </div>
+
+    <div class="grp">
+        <span class="trigger @if(request()->routeIs('admin.queue', 'admin.settings', 'admin.account')) active @endif" tabindex="0">
+            System<span class="caret">▾</span>
+        </span>
+        <div class="menu">
+            <a href="{{ route('admin.queue') }}" @class(['active' => request()->routeIs('admin.queue')])>Warteschlange</a>
+            <a href="{{ route('admin.settings') }}" @class(['active' => request()->routeIs('admin.settings')])>Einstellungen</a>
+            <a href="{{ route('admin.account') }}" @class(['active' => request()->routeIs('admin.account')])>Konto</a>
+        </div>
+    </div>
     <form method="post" action="{{ route('admin.logout') }}">
         @csrf
         <button type="submit">Abmelden ({{ auth()->user()?->username ?? auth()->user()?->name }})</button>
