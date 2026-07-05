@@ -18,19 +18,25 @@ if ! mariadb-dump --single-transaction "$DB_NAME" | gzip > "$BACKUP_DIR/db-$DATE
 fi
 
 # Konfiguration + Schluessel + verschluesselte Nachrichten
-if ! tar --warning=none -czf "$BACKUP_DIR/files-$DATE.tar.gz" \
-    "$APP_DIR/.env" \
-    /etc/secway.conf \
-    /etc/postfix \
-    /etc/nginx/sites-available \
-    /etc/letsencrypt \
-    /etc/cron.d \
-    /etc/fail2ban \
-    /usr/local/sbin/mgw-backup.sh \
-    /usr/local/sbin/mgw-health.sh \
-    /usr/local/sbin/mgw-queue-helper.sh \
-    "$APP_DIR/storage/app/messages" \
-    "$APP_DIR/storage/app/signatures" 2>/dev/null; then
+BACKUP_PATHS=(
+    "$APP_DIR/.env"
+    /etc/secway.conf
+    /etc/postfix
+    /etc/nginx/sites-available
+    /etc/letsencrypt
+    /etc/cron.d
+    /etc/fail2ban
+    /usr/local/sbin/mgw-backup.sh
+    /usr/local/sbin/mgw-health.sh
+    /usr/local/sbin/mgw-queue-helper.sh
+    "$APP_DIR/storage/app/messages"
+)
+# Signaturblock-Bilder liegen auf der Laravel-"local"-Disk (storage/app/private).
+# Optional: Das Verzeichnis entsteht erst mit dem ersten Bild-Upload.
+[ -d "$APP_DIR/storage/app/private/signatures" ] \
+    && BACKUP_PATHS+=("$APP_DIR/storage/app/private/signatures")
+
+if ! tar --warning=none -czf "$BACKUP_DIR/files-$DATE.tar.gz" "${BACKUP_PATHS[@]}" 2>/dev/null; then
     FAIL+="Datei-Backup fehlgeschlagen"$'\n'
 fi
 
