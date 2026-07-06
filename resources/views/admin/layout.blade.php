@@ -92,7 +92,7 @@
     <a href="{{ route('admin.log') }}" @class(['active' => request()->routeIs('admin.log')])>Protokoll</a>
 
     <div class="grp">
-        <span class="trigger @if(request()->routeIs('admin.messages', 'admin.held', 'admin.certs')) active @endif" tabindex="0">
+        <span class="trigger @if(request()->routeIs('admin.messages', 'admin.held', 'admin.certs', 'admin.sendrules')) active @endif" tabindex="0">
             Verschlüsselung{!! $heldCount > 0 ? '<span class="navbadge">'.$heldCount.'</span>' : '' !!}<span class="caret">▾</span>
         </span>
         <div class="menu">
@@ -101,6 +101,7 @@
                 <a href="{{ route('admin.held') }}" @class(['active' => request()->routeIs('admin.held')])>Zurückgehalten{{ $heldCount > 0 ? ' ('.$heldCount.')' : '' }}</a>
             @endif
             <a href="{{ route('admin.certs') }}" @class(['active' => request()->routeIs('admin.certs')])>Zertifikate</a>
+            <a href="{{ route('admin.sendrules') }}" @class(['active' => request()->routeIs('admin.sendrules')])>Sicher versenden</a>
         </div>
     </div>
 

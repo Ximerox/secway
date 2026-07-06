@@ -12,7 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Token-geschützte Add-in-API: keine CSRF-Prüfung (stateless, kein Session-Cookie)
+        $middleware->validateCsrfTokens(except: [
+            'api/classify',
+            'api/classify/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

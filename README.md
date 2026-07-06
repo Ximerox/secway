@@ -41,9 +41,7 @@ flowchart LR
   is encrypted (and optionally signed) automatically. No subject tag needed.
 - **Portal** — if the sender tagged the subject (default `[sicher]`) and no certificate exists,
   the message and its attachments are stored encrypted on the gateway. The recipient gets a
-  link by mail and — configurable minutes later — a password in a separate mail. Recipients
-  can **reply directly in the portal** (text + attachments, ClamAV-scanned); the reply is
-  delivered to the internal sender's inbox.
+  link by mail and — configurable minutes later — a password in a separate mail.
 - **Pass-through** — everything else is delivered unchanged.
 
 ### Inbound
@@ -52,11 +50,6 @@ Mail addressed to your own domains is decrypted with your own certificates, S/MI
 are verified (result recorded in an `X-MGW-Signature` header) and sender certificates are
 **harvested** from trusted signatures — so the next reply to that sender is encrypted
 automatically and the encryption loop closes by itself.
-
-If no matching private key exists, the mail is delivered unchanged by default. Optionally a
-**quarantine** holds such mail instead: the admin is notified which certificate is missing
-(issuer/serial), can upload it and the mail is decrypted and delivered automatically —
-after a configurable deadline it is delivered as received, so nothing is ever stuck or lost.
 
 ### Signature blocks (optional)
 
@@ -77,10 +70,7 @@ S/MIME **signing** above.
 
 - **Zero client footprint** — no plugins, no per-user setup; routing decisions are automatic
 - **Recipient portal** — token link + password (delivered time-shifted), brute-force lockout,
-  download tracking, automatic reminders, automatic expiry and irreversible deletion; optional
-  **secure replies** (text + attachments) with mandatory ClamAV scanning, per-message reply
-  limit and rate limiting — no `Reply-To` on the delivered mail, so a careless Outlook reply
-  can never bypass the gateway
+  download tracking, automatic reminders, automatic expiry and irreversible deletion
 - **Certificate management** — upload (PFX/PEM) for addresses or whole domains, automatic
   harvesting from verified inbound signatures, expiry overview
 - **Admin UI** (German) — statistics dashboard, message list with remind/delete, live Postfix
@@ -95,6 +85,11 @@ S/MIME **signing** above.
   common gateways and mail clients
 - **Signature-block module** (optional) — server-side e-mail footers from Entra ID with
   placeholders, rules, inline images, per-sender QR codes and optional Sent-Items update
+- **„Send securely?" Outlook add-in** (optional) — an OnMessageSend add-in that scores
+  outbound mail against admin-managed rules (sensitive attachment names, keyword thresholds,
+  past-dated birthdates) and prompts the sender to tag it for secure delivery; content stays
+  local (only subject/body/attachment-names sent), scoring + rule-precision logged without
+  message content. Backend under `/api/classify`, add-in in `outlook-addin/`.
 
 ## Requirements
 
@@ -161,7 +156,8 @@ portal passwords are stored as bcrypt hashes only. Every action is written to an
 ## Status & roadmap
 
 In production at a German non-profit since 2026, including the signature-block module for
-external and internal mail and portal replies. Roadmap: optional AES-GCM/OAEP cipher profile.
+external and internal mail. Roadmap: reply-from-portal for external recipients, optional
+AES-GCM/OAEP cipher profile.
 
 ## License
 

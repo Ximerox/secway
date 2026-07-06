@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminAuthController;
+use App\Http\Controllers\ClassifyController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\SignatureImageController;
 use App\Http\Controllers\SignatureQrController;
@@ -8,6 +9,7 @@ use App\Livewire\Admin\Account;
 use App\Livewire\Admin\Certificates;
 use App\Livewire\Admin\EntraUsers;
 use App\Livewire\Admin\Held;
+use App\Livewire\Admin\SendRules;
 use App\Livewire\Admin\SignatureEdit;
 use App\Livewire\Admin\Signatures;
 use App\Livewire\Admin\Log;
@@ -32,6 +34,11 @@ Route::post('/m/{token}', [PortalController::class, 'unlock'])->middleware('thro
 Route::get('/m/{token}/download/{attachment}', [PortalController::class, 'download'])->middleware('throttle:60,1');
 Route::post('/m/{token}/reply', [PortalController::class, 'reply'])->middleware('throttle:6,10');
 
+// Stateless-API fürs Outlook-Add-in „Sicher versenden?" (Token-Auth, CSRF-frei
+// via bootstrap/app.php). Erreichbar über die öffentliche Domain.
+Route::post('/api/classify', [ClassifyController::class, 'classify'])->middleware('throttle:120,1');
+Route::post('/api/classify/{log}/choice', [ClassifyController::class, 'choice'])->middleware('throttle:120,1');
+
 Route::prefix('admin')->group(function () {
     Route::get('login', [AdminAuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AdminAuthController::class, 'login'])->middleware('throttle:10,1');
@@ -54,6 +61,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/sig-qr/{qr}', [SignatureQrController::class, 'show'])->name('admin.sigqr');
         Route::get('/benutzer', EntraUsers::class)->name('admin.users');
         Route::get('/einstellungen', Settings::class)->name('admin.settings');
+        Route::get('/sicher-versenden', SendRules::class)->name('admin.sendrules');
         Route::get('/konto', Account::class)->name('admin.account');
     });
 });

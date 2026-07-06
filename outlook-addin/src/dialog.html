@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Sicher versenden?</title>
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #1f2937; padding: 18px; }
+        h1 { font-size: 16px; color: #1d4e89; margin-bottom: 8px; }
+        p { font-size: 13.5px; color: #4b5563; margin-bottom: 16px; }
+        .row { display: flex; gap: 10px; }
+        button { flex: 1; padding: 11px; font-size: 14px; font-weight: 600; border: 0; border-radius: 8px; cursor: pointer; }
+        .secure { background: #1d4e89; color: #fff; }
+        .secure:hover { background: #163d6d; }
+        .normal { background: #fff; color: #1d4e89; border: 1px solid #c7d4e6; }
+    </style>
+</head>
+<body>
+    <h1>Diese Nachricht sicher versenden?</h1>
+    <p>Der Inhalt könnte vertrauliche Daten enthalten. „Sicher versenden" übermittelt die Nachricht verschlüsselt bzw. über das geschützte Portal.</p>
+    <div class="row">
+        <button class="secure" onclick="choose('secure')">Sicher versenden</button>
+        <button class="normal" onclick="choose('normal')">Normal senden</button>
+    </div>
+    <script>
+        function choose(v) {
+            Office.onReady(function () {
+                Office.context.ui.messageParent(v);
+            });
+        }
+    </script>
+</body>
+</html>

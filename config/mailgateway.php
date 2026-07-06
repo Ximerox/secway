@@ -62,4 +62,9 @@ return [
     // PHP_BINARY = php-fpm und damit ungeeignet, daher separat konfigurierbar.
     'php_binary' => env('MGW_PHP_BINARY', '/usr/bin/php'),
 
+    // Bearer-Token für die Add-in-API /api/classify („Sicher versenden?").
+    // Das Outlook-Add-in muss diesen Wert als Authorization: Bearer mitsenden.
+    // Erzeugen z. B. mit: openssl rand -hex 32
+    'classify_token' => env('MGW_CLASSIFY_TOKEN'),
+
 ];
