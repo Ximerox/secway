@@ -42,7 +42,7 @@
             <thead><tr><th>Domain</th><th>Subject</th><th>Gültig bis</th><th>Status</th><th></th></tr></thead>
             <tbody>
             @forelse ($own as $c)
-                <tr>
+                <tr wire:click="showDetails({{ $c->id }})" style="cursor:pointer;" title="Klicken für Details">
                     <td><strong>{{ $c->target }}</strong></td>
                     <td class="muted">{{ $c->subject }}</td>
                     <td>{{ $c->valid_until?->format('d.m.Y') }}</td>
@@ -54,10 +54,13 @@
                         @endif
                     </td>
                     <td style="text-align:right; white-space:nowrap;">
-                        <button class="btn small ghost" wire:click="toggleActive({{ $c->id }})">{{ $c->active ? 'Deaktivieren' : 'Aktivieren' }}</button>
-                        <button class="btn small danger" wire:click="delete({{ $c->id }})" wire:confirm="Zertifikat für {{ $c->target }} wirklich löschen?">Löschen</button>
+                        <button class="btn small ghost" wire:click.stop="toggleActive({{ $c->id }})">{{ $c->active ? 'Deaktivieren' : 'Aktivieren' }}</button>
+                        <button class="btn small danger" wire:click.stop="delete({{ $c->id }})" wire:confirm="Zertifikat für {{ $c->target }} wirklich löschen?">Löschen</button>
                     </td>
                 </tr>
+                @if ($detailsId === $c->id)
+                    @include('livewire.admin.certificate-details', ['c' => $c, 'span' => 5])
+                @endif
             @empty
                 <tr><td colspan="5" class="muted">Noch kein eigenes Zertifikat hinterlegt — wird zum Signieren und für eingehende Entschlüsselung benötigt.</td></tr>
             @endforelse
@@ -71,7 +74,7 @@
             <thead><tr><th>Ziel</th><th>Ebene</th><th>Subject</th><th>Gültig bis</th><th>Quelle</th><th>Status</th><th></th></tr></thead>
             <tbody>
             @forelse ($partners as $c)
-                <tr>
+                <tr wire:click="showDetails({{ $c->id }})" style="cursor:pointer;" title="Klicken für Details">
                     <td><strong>{{ $c->target }}</strong></td>
                     <td>{{ $c->scope === 'domain' ? 'Domain' : 'Adresse' }}</td>
                     <td class="muted">{{ \Illuminate\Support\Str::limit($c->subject, 60) }}</td>
@@ -85,10 +88,13 @@
                         @endif
                     </td>
                     <td style="text-align:right; white-space:nowrap;">
-                        <button class="btn small ghost" wire:click="toggleActive({{ $c->id }})">{{ $c->active ? 'Deaktivieren' : 'Aktivieren' }}</button>
-                        <button class="btn small danger" wire:click="delete({{ $c->id }})" wire:confirm="Zertifikat für {{ $c->target }} wirklich löschen?">Löschen</button>
+                        <button class="btn small ghost" wire:click.stop="toggleActive({{ $c->id }})">{{ $c->active ? 'Deaktivieren' : 'Aktivieren' }}</button>
+                        <button class="btn small danger" wire:click.stop="delete({{ $c->id }})" wire:confirm="Zertifikat für {{ $c->target }} wirklich löschen?">Löschen</button>
                     </td>
                 </tr>
+                @if ($detailsId === $c->id)
+                    @include('livewire.admin.certificate-details', ['c' => $c, 'span' => 7])
+                @endif
             @empty
                 <tr><td colspan="7" class="muted">Noch keine Partner-Zertifikate. Ohne Zertifikat gehen Empfänger automatisch den Portal-Weg.</td></tr>
             @endforelse

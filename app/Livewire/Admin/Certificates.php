@@ -25,6 +25,84 @@ class Certificates extends Component
 
     public string $password = '';
 
+    public ?int $detailsId = null;
+
+    public string $exportPassword = '';
+
+    /** Detail-Panel für ein Zertifikat auf-/zuklappen. */
+    public function showDetails(int $id): void
+    {
+        $this->detailsId = $this->detailsId === $id ? null : $id;
+        $this->exportPassword = '';
+        $this->resetErrorBag('exportPassword');
+    }
+
+    /**
+     * Öffentliches Zertifikat (ohne Schlüssel) als PEM/.cer — zur Weitergabe
+     * an Kommunikationspartner, damit diese an uns verschlüsseln können.
+     */
+    public function exportPublic(int $id)
+    {
+        $cert = SmimeCertificate::findOrFail($id);
+
+        AuditEvent::log('cert_exported', ip: request()->ip(), details: [
+            'id' => $cert->id, 'target' => $cert->target, 'mode' => 'public',
+        ]);
+
+        $pem = implode("\n", $cert->pemBlocks())."\n";
+        $name = 'zertifikat-'.preg_replace('/[^a-z0-9.@-]+/i', '_', $cert->target).'.cer';
+
+        return response()->streamDownload(function () use ($pem) {
+            echo $pem;
+        }, $name, ['Content-Type' => 'application/x-x509-ca-cert']);
+    }
+
+    /**
+     * Eigenes Zertifikat INKLUSIVE privatem Schlüssel als passwortgeschütztes
+     * PKCS#12 — nur für Sicherung/Umzug, niemals an Partner weitergeben.
+     */
+    public function exportWithKey(int $id)
+    {
+        $cert = SmimeCertificate::where('type', 'own')->findOrFail($id);
+        if (! $cert->key_pem) {
+            $this->addError('exportPassword', 'Zu diesem Zertifikat ist kein privater Schlüssel gespeichert.');
+
+            return null;
+        }
+
+        $this->validate(
+            ['exportPassword' => 'required|string|min:8'],
+            ['exportPassword.required' => 'Bitte ein Export-Passwort vergeben (schützt die .p12-Datei).',
+             'exportPassword.min' => 'Mindestens 8 Zeichen.'],
+        );
+
+        $blocks = $cert->pemBlocks();
+        $p12 = '';
+        $ok = openssl_pkcs12_export(
+            $blocks[0] ?? $cert->cert_pem,
+            $p12,
+            $cert->privateKey(),
+            $this->exportPassword,
+            count($blocks) > 1 ? ['extracerts' => array_slice($blocks, 1)] : [],
+        );
+        if (! $ok) {
+            $this->addError('exportPassword', 'PKCS#12-Export fehlgeschlagen: '.(openssl_error_string() ?: 'unbekannter Fehler'));
+
+            return null;
+        }
+
+        AuditEvent::log('cert_exported', ip: request()->ip(), details: [
+            'id' => $cert->id, 'target' => $cert->target, 'mode' => 'with_key',
+        ]);
+        $this->exportPassword = '';
+
+        $name = 'zertifikat-mit-schluessel-'.preg_replace('/[^a-z0-9.@-]+/i', '_', $cert->target).'.p12';
+
+        return response()->streamDownload(function () use ($p12) {
+            echo $p12;
+        }, $name, ['Content-Type' => 'application/x-pkcs12']);
+    }
+
     public function save(SmimeCertificateService $service): void
     {
         $this->validate([

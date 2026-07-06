@@ -59,6 +59,60 @@ class SmimeCertificate extends Model
             ?? static::usable()->where('type', 'partner')->where('target', $domain)->orderByDesc('valid_until')->first();
     }
 
+    /** Alle PEM-Blöcke aus cert_pem: erster = Zertifikat selbst, Rest = CA-Kette. */
+    public function pemBlocks(): array
+    {
+        preg_match_all('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', (string) $this->cert_pem, $m);
+
+        return $m[0] ?? [];
+    }
+
+    /** Geparste Details des Zertifikats für die Anzeige im Admin. */
+    public function details(): array
+    {
+        $blocks = $this->pemBlocks();
+        $leaf = $blocks[0] ?? (string) $this->cert_pem;
+        $info = @openssl_x509_parse($leaf) ?: [];
+
+        $pub = @openssl_pkey_get_public($leaf);
+        $pubInfo = $pub ? openssl_pkey_get_details($pub) : null;
+        $keyType = match ($pubInfo['type'] ?? -1) {
+            OPENSSL_KEYTYPE_RSA => 'RSA',
+            OPENSSL_KEYTYPE_EC => 'EC',
+            OPENSSL_KEYTYPE_DSA => 'DSA',
+            default => null,
+        };
+
+        return [
+            'Inhaber (Subject)' => self::dnToString($info['subject'] ?? []),
+            'Aussteller (Issuer)' => self::dnToString($info['issuer'] ?? []),
+            'Seriennummer (hex)' => strtoupper((string) ($info['serialNumberHex'] ?? '')),
+            'Gültig von' => isset($info['validFrom_time_t']) ? date('d.m.Y H:i', $info['validFrom_time_t']) : null,
+            'Gültig bis' => isset($info['validTo_time_t']) ? date('d.m.Y H:i', $info['validTo_time_t']) : null,
+            'SHA-256-Fingerprint' => $this->fingerprint,
+            'E-Mail/SAN' => $info['extensions']['subjectAltName'] ?? null,
+            'Schlüssel' => $pubInfo && $keyType ? $keyType.', '.$pubInfo['bits'].' Bit' : null,
+            'Signaturalgorithmus' => $info['signatureTypeSN'] ?? null,
+            'Verwendung (Key Usage)' => $info['extensions']['keyUsage'] ?? null,
+            'Erw. Verwendung' => $info['extensions']['extendedKeyUsage'] ?? null,
+            'CA-Kette hinterlegt' => count($blocks) > 1 ? (count($blocks) - 1).' Zwischen-/Wurzelzertifikat(e)' : 'nein',
+            'Privater Schlüssel' => $this->key_pem ? 'vorhanden (verschlüsselt gespeichert)' : 'nicht vorhanden',
+        ];
+    }
+
+    /** DN-Array aus openssl_x509_parse in lesbaren String ("C=DE, O=…, CN=…"). */
+    private static function dnToString(array $dn): string
+    {
+        $parts = [];
+        foreach ($dn as $key => $value) {
+            foreach ((array) $value as $v) {
+                $parts[] = $key.'='.$v;
+            }
+        }
+
+        return implode(', ', $parts);
+    }
+
     /** Eigenes Adress-Zertifikat (mit Schlüssel) eines Absenders — zum Signieren. */
     public static function ownForAddress(string $email): ?self
     {
