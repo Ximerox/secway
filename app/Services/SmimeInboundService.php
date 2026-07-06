@@ -292,8 +292,10 @@ class SmimeInboundService
                 $serial = $hit[2];
                 if (str_starts_with($serial, '0x')) {
                     $serial = strtoupper(substr($serial, 2));
-                } elseif (ctype_digit($serial) && $serial <= (string) PHP_INT_MAX) {
-                    $serial = strtoupper(dechex((int) $serial));
+                } elseif (ctype_digit($serial)) {
+                    // Zertifikats-Tools zeigen Serials hexadezimal — auch jenseits
+                    // von PHP_INT_MAX umrechnen (bcmath), sonst findet man sie nicht
+                    $serial = self::decimalToHex($serial);
                 }
                 $targets[] = trim($hit[1]).' / Serial '.$serial;
             }
@@ -303,6 +305,18 @@ class SmimeInboundService
         }
 
         return ' (verschlüsselt an: '.implode(' | ', array_unique($targets)).')';
+    }
+
+    /** Dezimal → Hex für beliebig große Seriennummern (bcmath). */
+    private static function decimalToHex(string $dec): string
+    {
+        $hex = '';
+        while (bccomp($dec, '0') > 0) {
+            $hex = dechex((int) bcmod($dec, '16')).$hex;
+            $dec = bcdiv($dec, '16', 0);
+        }
+
+        return $hex === '' ? '0' : strtoupper($hex);
     }
 
     /**
