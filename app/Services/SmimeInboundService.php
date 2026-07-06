@@ -297,14 +297,17 @@ class SmimeInboundService
                     // von PHP_INT_MAX umrechnen (bcmath), sonst findet man sie nicht
                     $serial = self::decimalToHex($serial);
                 }
-                $targets[] = trim($hit[1]).' / Serial '.$serial;
+                $targets[] = 'Serial '.$serial.', ausgestellt von: '.trim($hit[1]);
             }
         }
         if ($targets === []) {
             return '';
         }
 
-        return ' (verschlüsselt an: '.implode(' | ', array_unique($targets)).')';
+        // Der Umschlag nennt nur Aussteller + Serial des Zielzertifikats —
+        // NICHT dessen Inhaber. Formulierung muss das klarmachen, sonst wird
+        // der Aussteller (z.B. eine interne CA) für das Zertifikat gehalten.
+        return ' (verschlüsselt an Zertifikat: '.implode(' | ', array_unique($targets)).')';
     }
 
     /** Dezimal → Hex für beliebig große Seriennummern (bcmath). */
