@@ -3,11 +3,13 @@
   SecWay „Sicher versenden?" — Outlook-Add-in (ereignisbasiert, OnMessageSend).
   Läuft in Outlook Desktop (Windows/Mac), OWA und der Outlook-App (Android/iOS).
 
-  Vor dem Ausrollen anpassen:
-    * <Id> ist eine einmalig erzeugte GUID — bei Nachnutzung durch Dritte
-      eine eigene erzeugen
-    * alle https://mailgateway.straphael.de/addin/ URLs auf den eigenen Host
+  Dies ist die VORLAGE. Vor dem Ausrollen eine Kopie AUSSERHALB des Repos
+  anlegen (z.B. public/addin/manifest.xml — ist gitignoriert) und dort:
+    * <Id> durch eine eigene, einmalig erzeugte GUID ersetzen
+    * alle https://secway.example.org/addin/ URLs auf den eigenen Host
       zeigen lassen (die Dateien aus outlook-addin/src dort statisch hosten)
+    * <ProviderName> auf den eigenen Betreiber setzen
+  Die echte Kopie (mit GUID + eigener Domain) gehoert nicht ins Repo.
   Zentral zuweisen: Microsoft 365 Admin Center → Einstellungen → Integrierte
   Apps → Benutzerdefinierte App hochladen (Manifest).
 -->
@@ -16,14 +18,14 @@
            xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
            xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
            xsi:type="MailApp">
-  <Id>9c2d2cfa-ab95-4a9a-87cf-dc575ba54741</Id>
+  <Id>REPLACE-WITH-YOUR-OWN-GUID-0000-000000000000</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>St. Raphael</ProviderName>
+  <ProviderName>Example Org</ProviderName>
   <DefaultLocale>de-DE</DefaultLocale>
   <DisplayName DefaultValue="SecWay – Sicher versenden"/>
   <Description DefaultValue="Fragt beim Senden nach, ob eine Mail als sicher versendet werden soll."/>
-  <IconUrl DefaultValue="https://mailgateway.straphael.de/addin/icon-64.png"/>
-  <HighResolutionIconUrl DefaultValue="https://mailgateway.straphael.de/addin/icon-128.png"/>
+  <IconUrl DefaultValue="https://secway.example.org/addin/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://secway.example.org/addin/icon-128.png"/>
   <Hosts>
     <Host Name="Mailbox"/>
   </Hosts>
@@ -35,7 +37,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://mailgateway.straphael.de/addin/commands.html"/>
+        <SourceLocation DefaultValue="https://secway.example.org/addin/commands.html"/>
         <RequestedHeight>250</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -74,9 +76,9 @@
       </Hosts>
       <Resources>
         <bt:Urls>
-          <bt:Url id="Commands.Url" DefaultValue="https://mailgateway.straphael.de/addin/commands.html"/>
-          <bt:Url id="WebViewRuntime.Url" DefaultValue="https://mailgateway.straphael.de/addin/commands.html"/>
-          <bt:Url id="JSRuntime.Url" DefaultValue="https://mailgateway.straphael.de/addin/classify.js"/>
+          <bt:Url id="Commands.Url" DefaultValue="https://secway.example.org/addin/commands.html"/>
+          <bt:Url id="WebViewRuntime.Url" DefaultValue="https://secway.example.org/addin/commands.html"/>
+          <bt:Url id="JSRuntime.Url" DefaultValue="https://secway.example.org/addin/classify.js"/>
         </bt:Urls>
       </Resources>
     </VersionOverrides>
