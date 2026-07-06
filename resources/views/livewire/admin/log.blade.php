@@ -34,18 +34,18 @@
                 @php
                     $g = $e->groupKey();
                     if ($g !== $lastGroup) { $band = ! $band; $lastGroup = $g; }
-                    $dir = $e->direction();
-                    $badge = match($dir) {
-                        'eingehend' => 'ok', 'ausgehend' => 'ok',
-                        'Portal' => 'warn', 'abgewiesen' => 'err', default => 'off',
-                    };
+                    [$dirLabel, $dirClass] = $e->directionBadge();
+                    $crypto = $e->cryptoBadge();
                     $extra = $e->extraDetails();
                 @endphp
                 <tr class="grp {{ $band ? 'b1' : 'b0' }}">
                     <td class="mono" style="white-space:nowrap;">{{ $e->created_at->format('d.m.Y') }}<br>{{ $e->created_at->format('H:i:s') }}</td>
-                    <td><span class="badge {{ $badge }}">{{ $dir }}</span></td>
+                    <td><span class="badge {{ $dirClass }}" style="white-space:nowrap;">{{ $dirLabel }}</span></td>
                     <td>
                         <div><strong>{{ $e->event }}</strong>
+                            @if ($crypto)
+                                <span class="badge {{ $crypto[1] }}" style="margin-left:6px;">{{ $crypto[0] }}</span>
+                            @endif
                             @if ($e->ip) <span class="muted">· IP {{ $e->ip }}</span> @endif
                         </div>
                         @if ($e->displaySender() || $e->displayRecipients())
@@ -69,6 +69,8 @@
     <div style="margin-top:14px;">{{ $events->links('pagination') }}</div>
 
     <style>
+        .badge.dir-out { background:#eff6ff; color:#1d4e89; }
+        .badge.crypt { background:#f5f3ff; color:#6d28d9; }
         table.log { width:100%; border-collapse:collapse; font-size:13.5px; }
         table.log th { text-align:left; color:#6b7280; font-size:12px; text-transform:uppercase; letter-spacing:.03em; padding:10px 14px; border-bottom:2px solid #e5e7eb; }
         table.log td { padding:9px 14px; vertical-align:top; border-bottom:1px solid #f0f1f3; }

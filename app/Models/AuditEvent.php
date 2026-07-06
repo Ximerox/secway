@@ -69,6 +69,62 @@ class AuditEvent extends Model
             || str_starts_with($this->event, 'settings_') ? 'System' : '—';
     }
 
+    /** Richtungs-Badge fürs Protokoll: [Label mit Pfeil, CSS-Klasse]. */
+    public function directionBadge(): array
+    {
+        return match ($this->direction()) {
+            'ausgehend' => ['↗ ausgehend', 'dir-out'],
+            'eingehend' => ['↙ eingehend', 'ok'],
+            'Portal' => ['Portal', 'warn'],
+            'abgewiesen' => ['abgewiesen', 'err'],
+            default => [$this->direction(), 'off'],
+        };
+    }
+
+    /**
+     * Krypto-Kennzeichnung fürs Protokoll (ver-/entschlüsselt/signiert):
+     * [Label, CSS-Klasse] oder null, wenn das Ereignis nichts Kryptografisches hat.
+     */
+    public function cryptoBadge(): ?array
+    {
+        if ($this->event === 'smime_sent') {
+            return [($this->details['signed'] ?? false) ? '🔒 verschlüsselt + signiert' : '🔒 verschlüsselt', 'crypt'];
+        }
+        if ($this->event === 'smime_fallback') {
+            return ['🔒 Verschlüsselung fehlgeschlagen → Portal', 'warn'];
+        }
+        if ($this->event === 'cert_harvested') {
+            return ['Zertifikat geerntet', 'ok'];
+        }
+        if ($this->event === 'inbound_processed') {
+            $labels = [];
+            $class = 'crypt';
+            foreach ((array) ($this->details['status'] ?? []) as $s) {
+                if (str_starts_with($s, 'decrypted') || str_starts_with($s, 'unwrapped_decrypted')) {
+                    $labels[] = '🔓 entschlüsselt';
+                } elseif (str_starts_with($s, 'decrypt_failed')) {
+                    $labels[] = '🔓 Entschlüsselung fehlgeschlagen';
+                    $class = 'err';
+                } elseif (str_starts_with($s, 'signature_invalid')) {
+                    $labels[] = 'Signatur UNGÜLTIG';
+                    $class = 'err';
+                } elseif (str_starts_with($s, 'signed_valid')) {
+                    $labels[] = '✓ signiert (gültig)';
+                } elseif (str_starts_with($s, 'signed_untrusted')) {
+                    $labels[] = 'signiert (Kette nicht vertrauenswürdig)';
+                    $class = $class === 'crypt' ? 'warn' : $class;
+                } elseif (str_starts_with($s, 'signed_cert_expired')) {
+                    $labels[] = 'signiert (Zertifikat abgelaufen)';
+                    $class = $class === 'crypt' ? 'warn' : $class;
+                }
+            }
+
+            return $labels === [] ? null : [implode(' · ', array_unique($labels)), $class];
+        }
+
+        return null;
+    }
+
     public function displaySender(): ?string
     {
         return $this->details['sender'] ?? $this->message?->sender_email;
