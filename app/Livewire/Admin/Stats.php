@@ -85,6 +85,11 @@ class Stats extends Component
             ->each(fn ($a) => $this->bump($topRecipientDomains, strtolower(substr((string) strrchr($a, '@'), 1))));
         SecureMessage::where('created_at', '>=', $from)->pluck('sender_email')
             ->each(fn ($a) => $this->bump($topSenders, strtolower($a)));
+        // Interne Domains ausblenden: seit dem Signaturmodul läuft auch die
+        // interne Post durchs Gateway und würde die Statistik dominieren.
+        foreach (\App\Support\InternalDomains::list() as $internal) {
+            unset($topRecipientDomains[$internal]);
+        }
         arsort($topRecipientDomains);
         arsort($topSenders);
 

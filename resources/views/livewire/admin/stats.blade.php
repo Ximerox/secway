@@ -105,7 +105,7 @@
 
         {{-- Top-Listen --}}
         <div class="card">
-            <strong>Häufigste Empfänger-Domains</strong>
+            <strong>Häufigste externe Empfänger-Domains</strong>
             @php $maxD = max([1, ...array_values($topRecipientDomains)]); @endphp
             <table class="plain">
                 @forelse ($topRecipientDomains as $dom => $n)
