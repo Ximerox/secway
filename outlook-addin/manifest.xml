@@ -4,7 +4,8 @@
   Läuft in Outlook Desktop (Windows/Mac), OWA und der Outlook-App (Android/iOS).
 
   Vor dem Ausrollen anpassen:
-    * <Id> durch eine eigene GUID ersetzen (einmalig erzeugen)
+    * <Id> ist eine einmalig erzeugte GUID — bei Nachnutzung durch Dritte
+      eine eigene erzeugen
     * alle https://mailgateway.straphael.de/addin/ URLs auf den eigenen Host
       zeigen lassen (die Dateien aus outlook-addin/src dort statisch hosten)
   Zentral zuweisen: Microsoft 365 Admin Center → Einstellungen → Integrierte
@@ -15,7 +16,7 @@
            xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
            xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
            xsi:type="MailApp">
-  <Id>REPLACE-WITH-YOUR-OWN-GUID-0000-000000000000</Id>
+  <Id>9c2d2cfa-ab95-4a9a-87cf-dc575ba54741</Id>
   <Version>1.0.0.0</Version>
   <ProviderName>St. Raphael</ProviderName>
   <DefaultLocale>de-DE</DefaultLocale>
@@ -40,6 +41,10 @@
     </Form>
   </FormSettings>
   <Permissions>ReadWriteItem</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+  </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides"
                     xsi:type="VersionOverridesV1_0">
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1"
