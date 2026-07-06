@@ -38,6 +38,9 @@ BACKUP_PATHS=(
 # Quarantäne (zurückgehaltene eingehende S/MIME-Mails), optional
 [ -d "$APP_DIR/storage/app/held" ] \
     && BACKUP_PATHS+=("$APP_DIR/storage/app/held")
+# Add-in-Deploy (gitignoriert: echtes Manifest + Token-injizierte Dateien), optional
+[ -d "$APP_DIR/public/addin" ] \
+    && BACKUP_PATHS+=("$APP_DIR/public/addin")
 
 if ! tar --warning=none -czf "$BACKUP_DIR/files-$DATE.tar.gz" "${BACKUP_PATHS[@]}" 2>/dev/null; then
     FAIL+="Datei-Backup fehlgeschlagen"$'\n'
