@@ -78,11 +78,24 @@ class MailIngest extends Command
             $external = array_values(array_diff($recipients, $internal));
 
             if ($internal !== []) {
-                app(SmimeMailService::class)->passThrough($raw, '', $internal);
-                AuditEvent::log('passed_through', details: array_merge($details, [
-                    'recipients' => $internal,
-                    'note' => 'leerer Envelope-Absender (Bounce/No-Reply) — unverändert zugestellt',
-                ]));
+                // Auch Bounce-/No-Reply-Mails können S/MIME sein (z.B. verschlüsselte
+                // Abwesenheitsnotiz eines Partner-Gateways, Envelope-Absender <>).
+                // Die müssen durch die Eingangs-Verarbeitung (Entschlüsselung),
+                // sonst landet unlesbarer Chiffretext beim Empfänger.
+                if (self::isSmimeMessage(Message::from($raw, false))) {
+                    $status = app(SmimeInboundService::class)->process($raw, '', $internal);
+                    AuditEvent::log('inbound_processed', details: array_merge($details, [
+                        'recipients' => $internal,
+                        'status' => $status,
+                        'note' => 'leerer Envelope-Absender (Bounce/No-Reply), S/MIME — entschlüsselt zugestellt',
+                    ]));
+                } else {
+                    app(SmimeMailService::class)->passThrough($raw, '', $internal);
+                    AuditEvent::log('passed_through', details: array_merge($details, [
+                        'recipients' => $internal,
+                        'note' => 'leerer Envelope-Absender (Bounce/No-Reply) — unverändert zugestellt',
+                    ]));
+                }
             }
             if ($external !== []) {
                 AuditEvent::log('ingest_dropped_bounce', details: array_merge($details, [
