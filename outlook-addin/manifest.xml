@@ -21,6 +21,8 @@
   <DefaultLocale>de-DE</DefaultLocale>
   <DisplayName DefaultValue="SecWay – Sicher versenden"/>
   <Description DefaultValue="Fragt beim Senden nach, ob eine Mail als sicher versendet werden soll."/>
+  <IconUrl DefaultValue="https://mailgateway.straphael.de/addin/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://mailgateway.straphael.de/addin/icon-128.png"/>
   <Hosts>
     <Host Name="Mailbox"/>
   </Hosts>

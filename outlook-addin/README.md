@@ -28,7 +28,9 @@ Läuft in Outlook Desktop (Windows/Mac), OWA und der Outlook-App (Android/iOS).
 
 1. **Dateien hosten** unter `https://<host>/addin/` (bei SecWay: `public/addin/`, per
    nginx ausgeliefert). `manifest.xml`-URLs und `SECWAY_URL` in `classify.js` auf den
-   eigenen Host anpassen.
+   eigenen Host anpassen. Die Add-in-Icons (Pflicht) liegen unter `assets/` und werden mit
+   `php make-icons.php <ziel>` erzeugt — nach `<host>/addin/` kopieren (icon-64.png/128.png
+   werden im Manifest referenziert).
 2. In `classify.js` **`SECWAY_TOKEN`** auf den Wert von `MGW_CLASSIFY_TOKEN` (SecWay-`.env`)
    setzen. Hinweis: Das Token liegt clientseitig im Add-in; für den Pilot vertretbar, da die
    API nur ein Ja/Nein liefert und keine Inhalte protokolliert. Für den breiten Rollout
