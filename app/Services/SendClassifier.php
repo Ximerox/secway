@@ -31,9 +31,15 @@ class SendClassifier
         $external = array_values(array_filter($recipients, fn ($r) => ! InternalDomains::isInternal($r)));
 
         $base = [
-            'score' => 0, 'hits' => [], 'smimeCovered' => false,
+            'score' => 0, 'hits' => [], 'smimeCovered' => false, 'internalOnly' => false,
             'recipientCount' => count($recipients), 'externalCount' => count($external),
         ];
+
+        // Nur-intern-Ausnahme: verlässt die Mail das Haus nicht, gibt es nichts
+        // zu verschlüsseln — weder prüfen noch fragen.
+        if ($recipients !== [] && $external === []) {
+            return ['ask' => false, ...$base, 'internalOnly' => true];
+        }
 
         // Positiv-Ausnahme: gehen alle (externen) Empfänger an zertifikatsgedeckte
         // Adressen, wird ohnehin verschlüsselt — keine Frage nötig.

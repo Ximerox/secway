@@ -45,6 +45,12 @@ class ClassifyController extends Controller
 
         $r = $classifier->classify($data, $threshold, $smimeException);
 
+        // Nur-intern-Mails: nicht fragen und bewusst NICHT protokollieren —
+        // sie sind die große Masse und würden die Auswertung fluten.
+        if ($r['internalOnly'] ?? false) {
+            return response()->json(['ask' => false, 'reason' => 'internal_only']);
+        }
+
         $log = SendClassifyLog::create([
             'score' => $r['score'],
             'asked' => $r['ask'],
