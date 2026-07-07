@@ -15,27 +15,41 @@ const SECWAY_TOKEN = "REPLACE-WITH-MGW_CLASSIFY_TOKEN";
 
 function onMessageSendHandler(event) {
     const item = Office.context.mailbox.item;
+
+    // Sicherheitsnetz: egal was passiert (Hänger in einem Office-Callback,
+    // langsame Antwort, unerwarteter Fehler) — nach spätestens 8 s wird normal
+    // gesendet, damit Outlook nie in seinen eigenen Timeout-Dialog läuft.
+    let done = false;
+    function finish(opts) {
+        if (done) return;
+        done = true;
+        event.completed(opts);
+    }
+    const watchdog = setTimeout(function () { finish({ allowEvent: true }); }, 8000);
+    function allow() { clearTimeout(watchdog); finish({ allowEvent: true }); }
+
     // fail-open: bei jedem unerwarteten Fehler normal senden
     try {
         collect(item, function (payload) {
             classify(payload, function (verdict) {
                 if (!verdict || !verdict.ask) {
-                    event.completed({ allowEvent: true });
+                    allow();
                     return;
                 }
                 askUser(function (choice) {
                     reportChoice(verdict.logId, choice);
                     if (choice === "secure") {
                         const tag = verdict.tag || "####";
-                        setTagThenSend(item, tag, event);
+                        clearTimeout(watchdog); // Nutzer entscheidet — Wächter aus
+                        setTagThenSend(item, tag, function () { finish({ allowEvent: true }); });
                     } else {
-                        event.completed({ allowEvent: true });
+                        allow();
                     }
                 });
             });
         });
     } catch (e) {
-        event.completed({ allowEvent: true });
+        allow();
     }
 }
 
@@ -46,8 +60,12 @@ function collect(item, done) {
         payload.subject = (s.status === "succeeded" && s.value) ? s.value : "";
         item.body.getAsync(Office.CoercionType.Text, function (b) {
             payload.body = (b.status === "succeeded" && b.value) ? b.value : "";
-            (item.getAttachmentsAsync ? item.getAttachmentsAsync : function (cb) { cb({ status: "failed" }); })(function (a) {
-                if (a.status === "succeeded" && a.value) {
+            // WICHTIG: getAttachmentsAsync muss an item gebunden aufgerufen
+            // werden — sonst geht der this-Kontext verloren und Office.js wirft
+            // (der Callback käme nie zurück → Handler hinge). getAttachmentsAsync
+            // gibt es erst ab Mailbox 1.8; sonst ohne Anhangsnamen fortfahren.
+            function withAttachments(a) {
+                if (a && a.status === "succeeded" && a.value) {
                     payload.attachments = a.value
                         .filter(function (att) { return !att.isInline; })
                         .map(function (att) { return att.name; });
@@ -56,7 +74,12 @@ function collect(item, done) {
                     payload.recipients = rcpts;
                     done(payload);
                 });
-            });
+            }
+            if (typeof item.getAttachmentsAsync === "function") {
+                item.getAttachmentsAsync(withAttachments);
+            } else {
+                withAttachments({ status: "failed" });
+            }
         });
     });
 }
