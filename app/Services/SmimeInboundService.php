@@ -339,8 +339,16 @@ class SmimeInboundService
         }
         $content = is_file($contentFile) ? file_get_contents($contentFile) : null;
 
-        // Kettenprüfung gegen die System-CAs → aktiv vs. manuelle Freigabe
-        $chainOk = @openssl_pkcs7_verify($file, 0, $tmpDir.'/signer-chain.pem', ['/etc/ssl/certs/ca-certificates.crt']) === true;
+        // Kettenprüfung: erst gegen S/MIME-Roots + System-CAs (mit den in der
+        // Signatur mitgelieferten Zwischenzertifikaten), bei Misserfolg lädt
+        // der Validator fehlende Zwischenzertifikate per AIA nach.
+        $chainOk = @openssl_pkcs7_verify($file, 0, $tmpDir.'/signer-chain.pem', SmimeChainValidator::caInfo()) === true;
+        $chainExtra = [];
+        if (! $chainOk) {
+            $result = app(SmimeChainValidator::class)->validate((string) file_get_contents($signerFile));
+            $chainOk = $result['trusted'];
+            $chainExtra = $result['chain'];
+        }
 
         $pem = (string) file_get_contents($signerFile);
         $x509 = @openssl_x509_read($pem);
@@ -366,7 +374,7 @@ class SmimeInboundService
             'type' => 'partner',
             'scope' => 'address',
             'target' => strtolower($sender),
-            'cert_pem' => $pem,
+            'cert_pem' => $chainExtra === [] ? $pem : trim(implode("\n", [$pem, ...$chainExtra]))."\n",
             'subject' => mb_substr($this->dnToString($info['subject'] ?? []), 0, 512),
             'issuer' => mb_substr($this->dnToString($info['issuer'] ?? []), 0, 512),
             'valid_from' => Carbon::createFromTimestamp($info['validFrom_time_t']),

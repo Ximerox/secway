@@ -102,6 +102,13 @@ Betriebssystem-Sicherheitsupdates installiert `unattended-upgrades` automatisch;
   entschlüsselt und zugestellt (oder sofort: Admin → Zurückgehalten → *Erneut entschlüsseln*).
   Nach Fristablauf wird automatisch unverändert (verschlüsselt) zugestellt. Ein-/ausschalten:
   Admin → Einstellungen → *Eingehende S/MIME-Quarantäne*.
+- **Geerntetes Zertifikat „Kette nicht validierbar":** Das Gateway prüft gegen den
+  Mozilla-E-Mail-Root-Store (`storage/app/smime-roots.pem`, wöchentlich via
+  `smime:update-roots` aus der CCADB) und lädt fehlende Zwischenzertifikate per AIA nach.
+  Inaktive geerntete Zertifikate werden täglich automatisch nachgeprüft
+  (`smime:recheck-harvested`) und bei validierbarer Kette aktiviert. Bleibt ein Zertifikat
+  inaktiv, ist es selbstsigniert/privat — dann bewusst manuell unter Admin → Zertifikate
+  freigeben.
 - **Impressum/Datenschutz ändern:** Admin → Einstellungen → HTML-Felder unten.
 - **Eigenes Kennwort / Benutzername ändern:** Admin → Konto.
 - **Weiteren Admin-Benutzer anlegen:** per Tinker (siehe INSTALL.md, „First admin user").
