@@ -14,6 +14,13 @@ server {
     charset utf-8;
     client_max_body_size 60M;          # matches Postfix message_size_limit + headroom
 
+    # Add-in-Dateien nicht cachen, damit Aktualisierungen bei den Clients
+    # (Outlook cacht ereignisbasierte Add-ins aggressiv) zeitnah ankommen.
+    location /addin/ {
+        add_header Cache-Control "no-cache, must-revalidate" always;
+        try_files $uri =404;
+    }
+
     location / {
         try_files $uri $uri/ /index.php?$query_string;
     }
