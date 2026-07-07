@@ -36,6 +36,14 @@ fi
 # 6) Neustart nach Updates noetig?
 [ -f /var/run/reboot-required ] && ISSUES+="Hinweis: Neustart nach Sicherheitsupdates erforderlich."$'\n'
 
+# 7) Systempfade muessen root gehoeren - sonst verweigert systemd-tmpfiles beim
+#    naechsten Boot die Arbeit (/run/mysqld, /run/php fehlen -> DB/PHP starten
+#    nicht). Ist am 07.07.2026 passiert (Kopieraktion hatte Windows-UIDs gesetzt).
+for p in / /etc /usr /usr/local /var; do
+    OWNER=$(stat -c '%u' "$p" 2>/dev/null)
+    [ "${OWNER:-0}" != "0" ] && ISSUES+="Systempfad $p gehoert UID $OWNER statt root - vor dem naechsten Reboot beheben: chown root:root $p"$'\n'
+done
+
 if [ -n "$ISSUES" ]; then
     HASH=$(printf '%s' "$ISSUES" | md5sum | cut -d' ' -f1)
     LAST=$(cat "$STATE" 2>/dev/null)
