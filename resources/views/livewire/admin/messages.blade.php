@@ -57,6 +57,7 @@
                         @if ($m->recipients->whereNull('first_viewed_at')->isNotEmpty())
                             <button class="btn small ghost" wire:click="remind({{ $m->id }})">Erinnern</button>
                         @endif
+                        <button class="btn small ghost" wire:click="resendPassword({{ $m->id }})" wire:confirm="Dem Empfänger ein NEUES Kennwort senden? Das bisherige wird dabei ungültig.">Kennwort senden</button>
                         <button class="btn small danger" wire:click="purge({{ $m->id }})" wire:confirm="Diese Nachricht endgültig löschen? Der Empfänger kann sie dann nicht mehr abrufen.">Löschen</button>
                     </td>
                 </tr>
