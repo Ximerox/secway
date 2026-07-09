@@ -134,6 +134,20 @@ class MailIngest extends Command
         // (S/MIME, Portal, PassThrough) die signierte Fassung verwenden.
         // Nur für interne Absender, komplett hinter dem Setting signature_enabled.
         if (Setting::getBool('signature_enabled', false) && InternalDomains::isInternal($sender)) {
+            // Compose-Add-in hat den Block bereits im Client eingefügt (Header
+            // X-MGW-Signed): Signatur-Schritt UND Postausgang-Tausch überspringen —
+            // die Gesendet-Kopie enthält den Block ja schon. Der Header ist ein rein
+            // interner Marker und wird vor der Zustellung entfernt (Drop-Listen in
+            // SmimeMailService). Er wäre von außen fälschbar — das bewirkt aber nur
+            // einen fehlenden Fuß, und hierher kommen ohnehin nur interne Absender.
+            if (RawMail::findHeader(RawMail::split($raw)[0], 'x-mgw-signed') !== null) {
+                AuditEvent::log('signature_client', details: [
+                    'queue_id' => $queueId,
+                    'sender' => $sender,
+                    'recipients' => $recipients,
+                    'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
+                ]);
+            } else {
             try {
                 $sig = app(SignatureMailService::class)->apply($raw, $sender, $recipients);
                 if ($sig['applied'] !== []) {
@@ -171,6 +185,7 @@ class MailIngest extends Command
                     'reason' => mb_substr($e->getMessage(), 0, 500),
                 ]);
             }
+            } // Ende else (kein X-MGW-Signed-Header)
         }
 
         // Empfänger aufteilen (Verhalten über Admin-Einstellungen steuerbar):

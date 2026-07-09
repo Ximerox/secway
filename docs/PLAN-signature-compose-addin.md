@@ -1,6 +1,6 @@
 # Plan: Signaturblock-Compose-Add-in („Signatur beim Schreiben sichtbar")
 
-Stand: 08.07.2026 · Status: **GEPLANT, nicht begonnen** · Vorlage für die Umsetzung
+Stand: 08.07.2026 · Status: **Schritte 1–3 umgesetzt** (API + Gateway-Skip live, Add-in gebaut+validiert+gehostet; M365-Upload wartet auf stabilen Betrieb von Add-in Nr. 1) · Vorlage für die Umsetzung
 (auch durch eine andere Claude-Instanz — dieses Dokument ist die maßgebliche Spezifikation).
 
 ## Ziel

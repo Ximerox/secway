@@ -20,6 +20,7 @@ class AuditEvent extends Model
         'smime_sent' => 'ausgehend',
         'smime_fallback' => 'ausgehend',
         'signature_applied' => 'ausgehend',
+        'signature_client' => 'ausgehend',
         'signature_skipped' => 'ausgehend',
         'signature_failed' => 'ausgehend',
         'sent_items_updated' => 'ausgehend',

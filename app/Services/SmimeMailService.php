@@ -107,6 +107,7 @@ class SmimeMailService
         $drop = [
             strtolower((string) config('mailgateway.secret_header')),
             'x-mgw-notification',
+            'x-mgw-signed', // interner Marker des Compose-Add-ins, nie zum Empfänger
             'bcc',
         ];
         $keep = [];
@@ -150,6 +151,7 @@ class SmimeMailService
             'mime-version', 'subject', 'bcc',
             strtolower((string) config('mailgateway.secret_header')),
             'x-mgw-notification',
+            'x-mgw-signed', // interner Marker des Compose-Add-ins, nie zum Empfänger
         ];
         $keep = [];
         foreach (RawMail::headerLines($headerBlock) as $line) {

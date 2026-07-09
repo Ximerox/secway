@@ -67,4 +67,9 @@ return [
     // Erzeugen z. B. mit: openssl rand -hex 32
     'classify_token' => env('MGW_CLASSIFY_TOKEN'),
 
+    // Bearer-Token für das Compose-Add-in „SecWay Signatur" (/api/signature).
+    // Bewusst getrennt vom Classify-Token: eines lässt sich rotieren/sperren,
+    // ohne das andere Add-in zu stören.
+    'signature_token' => env('MGW_SIGNATURE_TOKEN'),
+
 ];

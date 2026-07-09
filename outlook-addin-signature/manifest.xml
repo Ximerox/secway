@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SecWay Signatur — Compose-Add-in (ereignisbasiert, OnNewMessageCompose +
+  OnMessageRecipientsChanged). Fügt den Signaturblock schon beim Verfassen ein;
+  das Gateway bleibt Auffangnetz für Clients ohne Add-in (Mobile etc.).
+
+  Dies ist die VORLAGE. Vor dem Ausrollen eine Kopie AUSSERHALB des Repos
+  anlegen (z. B. public/addin/sig/manifest.xml — ist gitignoriert) und dort:
+    * <Id> durch eine eigene, einmalig erzeugte GUID ersetzen (NICHT die des
+      „Sicher versenden?"-Add-ins!)
+    * alle https://secway.example.org/... URLs auf den eigenen Host zeigen lassen
+    * <ProviderName> auf den eigenen Betreiber setzen
+  Zentral zuweisen: Microsoft 365 Admin Center → Einstellungen → Integrierte
+  Apps → Benutzerdefinierte App hochladen (Manifest). Erst Pilotnutzer!
+-->
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xsi:type="MailApp">
+  <Id>REPLACE-WITH-YOUR-OWN-GUID-1111-111111111111</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Example Org</ProviderName>
+  <DefaultLocale>de-DE</DefaultLocale>
+  <DisplayName DefaultValue="SecWay Signatur"/>
+  <Description DefaultValue="Fügt beim Verfassen automatisch den zentralen Signaturblock ein."/>
+  <IconUrl DefaultValue="https://secway.example.org/addin/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://secway.example.org/addin/icon-128.png"/>
+  <SupportUrl DefaultValue="https://secway.example.org/impressum"/>
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.5"/>
+    </Sets>
+  </Requirements>
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://secway.example.org/addin/sig/compose.html"/>
+        <RequestedHeight>250</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+  <Permissions>ReadWriteItem</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+  </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides"
+                    xsi:type="VersionOverridesV1_0">
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1"
+                      xsi:type="VersionOverridesV1_1">
+      <Requirements>
+        <!-- 1.11: OnMessageRecipientsChanged (setSignatureAsync braucht 1.10) -->
+        <bt:Sets DefaultMinVersion="1.11">
+          <bt:Set Name="Mailbox"/>
+        </bt:Sets>
+      </Requirements>
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <Runtimes>
+            <Runtime resid="WebViewRuntime.Url">
+              <Override type="javascript" resid="JSRuntime.Url"/>
+            </Runtime>
+          </Runtimes>
+          <DesktopFormFactor>
+            <FunctionFile resid="Commands.Url"/>
+            <ExtensionPoint xsi:type="LaunchEvent">
+              <LaunchEvents>
+                <LaunchEvent Type="OnNewMessageCompose" FunctionName="onComposeHandler"/>
+                <LaunchEvent Type="OnMessageRecipientsChanged" FunctionName="onComposeHandler"/>
+              </LaunchEvents>
+              <SourceLocation resid="WebViewRuntime.Url"/>
+            </ExtensionPoint>
+          </DesktopFormFactor>
+        </Host>
+      </Hosts>
+      <Resources>
+        <bt:Urls>
+          <bt:Url id="Commands.Url" DefaultValue="https://secway.example.org/addin/sig/compose.html"/>
+          <bt:Url id="WebViewRuntime.Url" DefaultValue="https://secway.example.org/addin/sig/compose.html"/>
+          <bt:Url id="JSRuntime.Url" DefaultValue="https://secway.example.org/addin/sig/signature.js"/>
+        </bt:Urls>
+      </Resources>
+    </VersionOverrides>
+  </VersionOverrides>
+</OfficeApp>

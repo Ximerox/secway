@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\ClassifyController;
 use App\Http\Controllers\PortalController;
+use App\Http\Controllers\SignatureController;
 use App\Http\Controllers\SignatureImageController;
 use App\Http\Controllers\SignatureQrController;
 use App\Livewire\Admin\Account;
@@ -38,6 +39,9 @@ Route::post('/m/{token}/reply', [PortalController::class, 'reply'])->middleware(
 // via bootstrap/app.php). Erreichbar über die öffentliche Domain.
 Route::post('/api/classify', [ClassifyController::class, 'classify'])->middleware('throttle:120,1');
 Route::post('/api/classify/{log}/choice', [ClassifyController::class, 'choice'])->middleware('throttle:120,1');
+
+// Stateless-API fürs Compose-Add-in „SecWay Signatur" (eigenes Token)
+Route::post('/api/signature', [SignatureController::class, 'signature'])->middleware('throttle:240,1');
 
 Route::prefix('admin')->group(function () {
     Route::get('login', [AdminAuthController::class, 'showLogin'])->name('login');

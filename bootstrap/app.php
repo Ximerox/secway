@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'api/classify',
             'api/classify/*',
+            'api/signature',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
