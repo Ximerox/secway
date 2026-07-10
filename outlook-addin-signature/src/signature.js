@@ -113,7 +113,13 @@ function removeHeader(item, done) {
     }
 }
 
-// Registrierung für beide Compose-Ereignisse (ein Handler, gleiche Logik)
-if (typeof Office !== "undefined" && Office.actions && Office.actions.associate) {
-    Office.actions.associate("onComposeHandler", onComposeHandler);
+// Registrierung für beide Compose-Ereignisse (ein Handler, gleiche Logik).
+// WICHTIG: erst in Office.onReady registrieren — auf Modulebene ist der
+// Ereignis-Dispatcher noch nicht bereit, die Zuordnung geht verloren und der
+// Handler feuert nie (beim „Sicher versenden?"-Add-in am 10.07.2026 per
+// Diagnose nachgewiesen — gilt für ALLE ereignisbasierten Handler).
+if (typeof Office !== "undefined" && Office.onReady) {
+    Office.onReady(function () {
+        Office.actions.associate("onComposeHandler", onComposeHandler);
+    });
 }
