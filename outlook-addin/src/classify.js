@@ -119,7 +119,7 @@ function gatherRecipients(item, done) {
 /* SecWay fragen; jeder Fehler/Timeout => senden (verdict.ask=false) */
 function classify(payload, done) {
     const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
-    if (ctrl) setTimeout(function () { ctrl.abort(); }, 4000);
+    if (ctrl) setTimeout(function () { ctrl.abort(); }, 6000);
     fetch(SECWAY_URL + "/api/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SECWAY_TOKEN },

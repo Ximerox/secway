@@ -109,6 +109,12 @@ Betriebssystem-Sicherheitsupdates installiert `unattended-upgrades` automatisch;
   (`smime:recheck-harvested`) und bei validierbarer Kette aktiviert. Bleibt ein Zertifikat
   inaktiv, ist es selbstsigniert/privat — dann bewusst manuell unter Admin → Zertifikate
   freigeben.
+- **Lokale KI-Prüfung (optional):** Ein llama.cpp-Dienst (`llm-classify.service`, nur localhost:8081,
+  Modell Qwen2.5-7B) bewertet ausgehende Mails auf schutzbedürftige Sozialdaten. Aktiviert über eine
+  Send-Regel vom Typ „Lokale KI-Prüfung" (Admin → Sicher versenden). Fail-safe: Ist der Dienst aus,
+  trägt die Regel 0 bei, die Klassifizierung läuft normal weiter. Stoppen/Starten:
+  `systemctl {stop|start} llm-classify`. Ressourcengrenzen (8 Kerne/7 GB) in der systemd-Unit — der
+  Mailbetrieb hat Vorrang. Die Mailinhalte verlassen den Server nicht.
 - **Impressum/Datenschutz ändern:** Admin → Einstellungen → HTML-Felder unten.
 - **Eigenes Kennwort / Benutzername ändern:** Admin → Konto.
 - **Weiteren Admin-Benutzer anlegen:** per Tinker (siehe INSTALL.md, „First admin user").

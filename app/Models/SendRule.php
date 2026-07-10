@@ -29,6 +29,7 @@ class SendRule extends Model
             'attachment_name' => 'Anhang-Name',
             'keyword' => 'Stichwörter',
             'birthdate' => 'Geburtsdatum',
+            'llm' => 'Lokale KI-Prüfung',
             default => $this->type,
         };
     }

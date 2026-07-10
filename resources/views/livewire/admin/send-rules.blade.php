@@ -75,15 +75,18 @@
                         <option value="attachment_name">Anhang-Dateiname enthält …</option>
                         <option value="keyword">Stichwörter im Text (mit Mindestanzahl)</option>
                         <option value="birthdate">Geburtsdatum (Datum in der Vergangenheit)</option>
+                        <option value="llm">Lokale KI-Prüfung (Sozialdaten-Erkennung)</option>
                     </select>
                 </div>
             </div>
-            @if ($type !== 'birthdate')
+            @if (in_array($type, ['attachment_name', 'keyword']))
                 <div style="margin-top:10px;">
                     <label>Begriffe (komma- oder zeilengetrennt)</label>
                     <textarea wire:model="terms" rows="3" style="width:100%;" placeholder="{{ $type === 'attachment_name' ? 'Hilfeplan, Leistungsplan, PEP, Stammblatt' : 'Sorgerecht, psychisch, Krise, Diagnose' }}"></textarea>
                     @error('terms')<div class="error">{{ $message }}</div>@enderror
                 </div>
+            @elseif ($type === 'llm')
+                <p class="muted" style="margin-top:10px;">Ein lokales KI-Modell auf dem Server prüft Betreff und Text auf schutzbedürftige Sozialdaten. Keine Begriffsliste nötig; die Mailinhalte verlassen den Server nicht. Bei Treffer wird der Score-Beitrag addiert.</p>
             @endif
             <div class="grid2" style="margin-top:10px;">
                 @if ($type === 'keyword')

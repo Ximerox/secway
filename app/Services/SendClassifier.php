@@ -6,6 +6,8 @@ use App\Models\SendRule;
 use App\Models\SmimeCertificate;
 use App\Support\InternalDomains;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Bewertet eine ausgehende Mail (Betreff, Text, Anhang-Dateinamen, Empfänger)
@@ -17,6 +19,15 @@ use Carbon\Carbon;
  */
 class SendClassifier
 {
+    /** Knappe, deutschsprachige System-Anweisung für den lokalen LLM. */
+    private const LLM_SYSTEM =
+        'Datenschutz-Filter Kinder-/Jugendhilfe. Enthält die Mail schutzbedürftige '
+        .'personenbezogene Daten konkreter Betroffener (Gesundheit, Soziales, Familie, '
+        .'Name+Geburtsdatum/Adresse, Diagnose, Hilfe-/Sorgerecht/Kindeswohl)? '
+        .'Organisatorisch/technisch/allgemein = nein. Antworte NUR JSON: '
+        .'{"sensibel":true|false,"score":0-100}';
+
+
     /**
      * @param  array{subject?:string, body?:string, attachments?:array<int,string>, recipients?:array<int,string>}  $input
      * @return array{ask:bool, score:int, hits:array<int,array{id:int,name:string,score:int}>, smimeCovered:bool, recipientCount:int, externalCount:int}
@@ -54,7 +65,7 @@ class SendClassifier
         $score = 0;
         $hits = [];
         foreach (SendRule::where('active', true)->get() as $rule) {
-            $contribution = $this->evaluate($rule, $haystack, $names);
+            $contribution = $this->evaluate($rule, $haystack, $names, $subject, $body);
             if ($contribution > 0) {
                 $score += $contribution;
                 $hits[] = ['id' => $rule->id, 'name' => $rule->name, 'score' => $contribution];
@@ -65,14 +76,50 @@ class SendClassifier
     }
 
     /** Punktebeitrag einer einzelnen Regel (0 = kein Treffer). */
-    private function evaluate(SendRule $rule, string $haystack, array $attachmentNames): int
+    private function evaluate(SendRule $rule, string $haystack, array $attachmentNames, string $subject, string $body): int
     {
         return match ($rule->type) {
             'attachment_name' => $this->matchAny($rule->termList(), $attachmentNames) ? $rule->score : 0,
             'keyword' => $this->countTerms($rule->termList(), $haystack) >= max(1, $rule->threshold) ? $rule->score : 0,
             'birthdate' => $this->hasPastDate($haystack, max(0, $rule->threshold)) ? $rule->score : 0,
+            'llm' => $this->evaluateLlm($subject, $body) ? $rule->score : 0,
             default => 0,
         };
+    }
+
+    /**
+     * Lokaler LLM (llama.cpp): stuft die Mail als schutzbedürftig ein?
+     * Fail-safe: Bei Nichterreichbarkeit/Timeout/Fehler → false (kein Beitrag),
+     * damit die Klassifizierung nie am LLM hängen bleibt. Body gedeckelt, um
+     * die Latenz im Zeitbudget des Add-ins zu halten.
+     */
+    private function evaluateLlm(string $subject, string $body): bool
+    {
+        $endpoint = (string) config('mailgateway.llm_endpoint');
+        if ($endpoint === '') {
+            return false;
+        }
+        try {
+            $resp = Http::timeout((int) config('mailgateway.llm_timeout', 3))->post($endpoint, [
+                'temperature' => 0,
+                'max_tokens' => 24,
+                'response_format' => ['type' => 'json_object'],
+                'messages' => [
+                    ['role' => 'system', 'content' => self::LLM_SYSTEM],
+                    ['role' => 'user', 'content' => 'Betreff: '.$subject."\n".mb_substr($body, 0, 6000)],
+                ],
+            ]);
+            if (! $resp->successful()) {
+                return false;
+            }
+            $verdict = json_decode((string) data_get($resp->json(), 'choices.0.message.content', ''), true);
+
+            return is_array($verdict) && ! empty($verdict['sensibel']);
+        } catch (\Throwable $e) {
+            Log::warning('LLM-Klassifizierung nicht verfügbar', ['error' => $e->getMessage()]);
+
+            return false;
+        }
     }
 
     private function matchAny(array $terms, array $names): bool

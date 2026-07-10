@@ -72,4 +72,10 @@ return [
     // ohne das andere Add-in zu stören.
     'signature_token' => env('MGW_SIGNATURE_TOKEN'),
 
+    // Lokaler LLM-Klassifizierer (llama.cpp, OpenAI-kompatibel, nur localhost).
+    // Wird von der Send-Regel vom Typ „llm" genutzt. Timeout knapp halten,
+    // damit die /api/classify-Antwort im Zeitbudget des Add-ins bleibt.
+    'llm_endpoint' => env('MGW_LLM_ENDPOINT', 'http://127.0.0.1:8081/v1/chat/completions'),
+    'llm_timeout' => env('MGW_LLM_TIMEOUT', 3),
+
 ];
