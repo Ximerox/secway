@@ -59,10 +59,10 @@ function onMessageSendHandler(event) {
                     allowEvent: false,
                     sendModeOverride: "promptUser",
                     errorMessage:
-                        "Diese Nachricht könnte vertrauliche Daten enthalten. " +
+                        "Diese E-Mail könnte vertrauliche Daten enthalten. " +
                         "Für einen gesicherten, verschlüsselten Versand wählen Sie „Nicht senden“, " +
-                        "stellen Sie „" + tag + "“ an den Anfang des Betreffs und senden erneut. " +
-                        "Ist kein Schutz nötig, wählen Sie „Trotzdem senden“."
+                        "fügen dem Betreff „" + tag + "“ hinzu und senden die E-Mail erneut. " +
+                        "Sollten Sie die E-Mail trotzdem ungesichert senden wollen, klicken Sie auf „Trotzdem senden“."
                 });
             });
         });
