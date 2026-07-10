@@ -39,6 +39,7 @@ Route::post('/m/{token}/reply', [PortalController::class, 'reply'])->middleware(
 // via bootstrap/app.php). Erreichbar über die öffentliche Domain.
 Route::post('/api/classify', [ClassifyController::class, 'classify'])->middleware('throttle:120,1');
 Route::post('/api/classify/{log}/choice', [ClassifyController::class, 'choice'])->middleware('throttle:120,1');
+Route::get('/api/subject-tag', [ClassifyController::class, 'subjectTag'])->middleware('throttle:120,1');
 
 // Stateless-API fürs Compose-Add-in „SecWay Signatur" (eigenes Token)
 Route::post('/api/signature', [SignatureController::class, 'signature'])->middleware('throttle:240,1');

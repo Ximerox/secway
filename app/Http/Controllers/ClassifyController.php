@@ -68,6 +68,16 @@ class ClassifyController extends Controller
         ]);
     }
 
+    /** Aktuelles Betreff-Tag für den Ribbon-Button „Sicher senden". */
+    public function subjectTag(Request $request)
+    {
+        $this->authorizeToken($request);
+
+        return response()->json([
+            'tag' => (string) Setting::get('subject_tag', config('mailgateway.subject_tag')),
+        ]);
+    }
+
     /** Feedback des Add-ins: was der Nutzer nach der Frage gewählt hat. */
     public function choice(Request $request, SendClassifyLog $log)
     {

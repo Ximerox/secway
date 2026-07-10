@@ -18,6 +18,9 @@
  */
 const SECWAY_URL = "https://mailgateway.straphael.de";
 const SECWAY_TOKEN = "REPLACE-WITH-MGW_CLASSIFY_TOKEN";
+// Beim Deploy mit dem aktuellen Betreff-Tag ersetzt; dient als Rückfall,
+// falls der Live-Abruf des Tags scheitert.
+const SECWAY_TAG_FALLBACK = "REPLACE-WITH-SUBJECT-TAG";
 
 function onMessageSendHandler(event) {
     const item = Office.context.mailbox.item;
@@ -128,6 +131,60 @@ function classify(payload, done) {
         .catch(function () { done({ ask: false }); });
 }
 
+/* --- Ribbon-Button „Sicher senden" --------------------------------------- *
+ * Setzt das Betreff-Tag (falls noch nicht vorhanden) und sendet die Mail
+ * direkt. Der Betreff-getAsync/setAsync-Callback MUSS vor sendAsync
+ * abgeschlossen sein, sonst übernimmt Outlook die Betreffänderung evtl. nicht.
+ * Nach sendAsync läuft kein Code mehr zuverlässig — daher passiert danach
+ * nichts Wichtiges mehr außer event.completed().
+ */
+function secureSend(event) {
+    const item = Office.context.mailbox.item;
+    fetchTag(function (tag) {
+        item.subject.getAsync(function (s) {
+            const cur = (s.status === "succeeded" && s.value) ? s.value : "";
+            const has = cur.toLowerCase().indexOf(tag.toLowerCase()) !== -1;
+            const next = has ? cur : (tag + " " + cur);
+            item.subject.setAsync(next, function (setRes) {
+                if (setRes.status !== "succeeded") {
+                    notify(item, "Betreff konnte nicht markiert werden — bitte manuell „" + tag + "“ voranstellen.");
+                    event.completed();
+                    return;
+                }
+                if (typeof item.sendAsync === "function") {
+                    item.sendAsync(function () { try { event.completed(); } catch (e) {} });
+                } else {
+                    // Ältere Outlook-Version: Betreff ist markiert, Nutzer sendet selbst.
+                    notify(item, "Als sicher markiert („" + tag + "“). Bitte jetzt senden.");
+                    event.completed();
+                }
+            });
+        });
+    });
+}
+
+/* Aktuelles Tag vom Server; bei Fehler der beim Deploy injizierte Rückfall. */
+function fetchTag(done) {
+    const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    if (ctrl) setTimeout(function () { ctrl.abort(); }, 4000);
+    fetch(SECWAY_URL + "/api/subject-tag", {
+        headers: { "Authorization": "Bearer " + SECWAY_TOKEN },
+        signal: ctrl ? ctrl.signal : undefined
+    })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) { done(j && j.tag ? j.tag : SECWAY_TAG_FALLBACK); })
+        .catch(function () { done(SECWAY_TAG_FALLBACK); });
+}
+
+/* Info-Leiste im Entwurf (Fallback-Hinweise). */
+function notify(item, text) {
+    try {
+        item.notificationMessages.addAsync("secway-secure", {
+            type: "informationalMessage", message: text, icon: "none", persistent: false
+        });
+    } catch (e) { /* egal */ }
+}
+
 // Registrierung für das ereignisbasierte Runtime-Modell.
 // WICHTIG: erst in Office.onReady registrieren — vorher ist der Ereignis-
 // Dispatcher noch nicht bereit, die Zuordnung geht verloren und Outlook
@@ -136,5 +193,6 @@ function classify(payload, done) {
 if (typeof Office !== "undefined" && Office.onReady) {
     Office.onReady(function () {
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
+        Office.actions.associate("secureSend", secureSend);
     });
 }

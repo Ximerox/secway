@@ -19,13 +19,14 @@
            xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
            xsi:type="MailApp">
   <Id>REPLACE-WITH-YOUR-OWN-GUID-0000-000000000000</Id>
-  <Version>1.0.1.0</Version>
+  <Version>1.0.2.0</Version>
   <ProviderName>Example Org</ProviderName>
   <DefaultLocale>de-DE</DefaultLocale>
   <DisplayName DefaultValue="SecWay – Sicher versenden"/>
   <Description DefaultValue="Fragt beim Senden nach, ob eine Mail als sicher versendet werden soll."/>
   <IconUrl DefaultValue="https://secway.example.org/addin/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="https://secway.example.org/addin/icon-128.png"/>
+  <SupportUrl DefaultValue="https://secway.example.org/impressum"/>
   <Hosts>
     <Host Name="Mailbox"/>
   </Hosts>
@@ -71,15 +72,50 @@
               </LaunchEvents>
               <SourceLocation resid="WebViewRuntime.Url"/>
             </ExtensionPoint>
+            <!-- Ribbon-Button „Sicher senden" beim Verfassen einer Nachricht -->
+            <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="secwayGroup">
+                  <Label resid="secwayGroupLabel"/>
+                  <Control xsi:type="Button" id="secureSendButton">
+                    <Label resid="secureSendLabel"/>
+                    <Supertip>
+                      <Title resid="secureSendLabel"/>
+                      <Description resid="secureSendTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon.16"/>
+                      <bt:Image size="32" resid="Icon.32"/>
+                      <bt:Image size="80" resid="Icon.80"/>
+                    </Icon>
+                    <Action xsi:type="ExecuteFunction">
+                      <FunctionName>secureSend</FunctionName>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
           </DesktopFormFactor>
         </Host>
       </Hosts>
       <Resources>
+        <bt:Images>
+          <bt:Image id="Icon.16" DefaultValue="https://secway.example.org/addin/icon-16.png"/>
+          <bt:Image id="Icon.32" DefaultValue="https://secway.example.org/addin/icon-32.png"/>
+          <bt:Image id="Icon.80" DefaultValue="https://secway.example.org/addin/icon-80.png"/>
+        </bt:Images>
         <bt:Urls>
           <bt:Url id="Commands.Url" DefaultValue="https://secway.example.org/addin/commands.html"/>
           <bt:Url id="WebViewRuntime.Url" DefaultValue="https://secway.example.org/addin/commands.html"/>
           <bt:Url id="JSRuntime.Url" DefaultValue="https://secway.example.org/addin/classify.js"/>
         </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="secwayGroupLabel" DefaultValue="SecWay"/>
+          <bt:String id="secureSendLabel" DefaultValue="Sicher senden"/>
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="secureSendTip" DefaultValue="Markiert die Nachricht für den gesicherten, verschlüsselten Versand und sendet sie."/>
+        </bt:LongStrings>
       </Resources>
     </VersionOverrides>
   </VersionOverrides>
