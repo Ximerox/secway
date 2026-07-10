@@ -46,11 +46,15 @@ function onMessageSendHandler(event) {
                     return;
                 }
                 // Möglicherweise vertraulich: Versand mit Hinweis anhalten.
+                // sendModeOverride "promptUser" macht aus dem Manifest-SoftBlock
+                // zur Laufzeit eine Rückfrage MIT „Trotzdem senden" (ab Mailbox
+                // 1.14; ältere Clients bleiben beim SoftBlock = nur „Nicht senden").
                 // „Trotzdem senden" = ungeschützt raus; „Nicht senden" = zurück
                 // zum Entwurf, dann Betreff-Tag setzen und erneut senden.
                 const tag = verdict.tag || "####";
                 finish({
                     allowEvent: false,
+                    sendModeOverride: "promptUser",
                     errorMessage:
                         "Diese Nachricht könnte vertrauliche Daten enthalten. " +
                         "Für einen gesicherten, verschlüsselten Versand wählen Sie „Nicht senden“, " +
