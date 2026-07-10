@@ -152,7 +152,13 @@ function setTagThenSend(item, tag, event) {
     });
 }
 
-// Registrierung für das ereignisbasierte Runtime-Modell
-if (typeof Office !== "undefined" && Office.actions && Office.actions.associate) {
-    Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
+// Registrierung für das ereignisbasierte Runtime-Modell.
+// WICHTIG: erst in Office.onReady registrieren — vorher ist der Ereignis-
+// Dispatcher noch nicht bereit, die Zuordnung geht verloren und Outlook
+// wartet beim Senden auf einen Handler, der nie anspringt (Timeout-Dialog).
+// (Am 10.07.2026 per Diagnose-Beacons nachgewiesen.)
+if (typeof Office !== "undefined" && Office.onReady) {
+    Office.onReady(function () {
+        Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
+    });
 }
