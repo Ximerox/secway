@@ -84,8 +84,8 @@ class SendRules extends Component
     {
         $this->validate([
             'name' => 'required|string|min:2|max:100',
-            'type' => 'in:attachment_name,keyword,birthdate,llm',
-            'terms' => 'required_unless:type,birthdate,llm|nullable|string|max:5000',
+            'type' => 'in:attachment_name,attachment_any,keyword,birthdate,llm',
+            'terms' => 'required_unless:type,birthdate,llm,attachment_any|nullable|string|max:5000',
             'rule_threshold' => 'required|integer|min:0|max:100',
             'score' => 'required|integer|min:1|max:1000',
         ], [
@@ -96,7 +96,7 @@ class SendRules extends Component
         $r->fill([
             'name' => trim($this->name),
             'type' => $this->type,
-            'terms' => in_array($this->type, ['birthdate', 'llm'], true) ? null : trim($this->terms),
+            'terms' => in_array($this->type, ['birthdate', 'llm', 'attachment_any'], true) ? null : trim($this->terms),
             'threshold' => $this->rule_threshold,
             'score' => $this->score,
             'active' => $this->active,

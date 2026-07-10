@@ -27,6 +27,7 @@ class SendRule extends Model
     {
         return match ($this->type) {
             'attachment_name' => 'Anhang-Name',
+            'attachment_any' => 'Anhang vorhanden',
             'keyword' => 'Stichwörter',
             'birthdate' => 'Geburtsdatum',
             'llm' => 'Lokale KI-Prüfung',

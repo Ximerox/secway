@@ -80,6 +80,10 @@ class SendClassifier
     {
         return match ($rule->type) {
             'attachment_name' => $this->matchAny($rule->termList(), $attachmentNames) ? $rule->score : 0,
+            // Reagiert allein auf die Existenz eines echten Anhangs. Inline-Bilder
+            // (z. B. Signatur-Logos) sendet das Add-in gar nicht erst mit — die
+            // Liste enthält also nur nicht-inline Dateianhänge.
+            'attachment_any' => $attachmentNames !== [] ? $rule->score : 0,
             'keyword' => $this->countTerms($rule->termList(), $haystack) >= max(1, $rule->threshold) ? $rule->score : 0,
             'birthdate' => $this->hasPastDate($haystack, max(0, $rule->threshold)) ? $rule->score : 0,
             'llm' => $this->evaluateLlm($subject, $body) ? $rule->score : 0,

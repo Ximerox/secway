@@ -73,6 +73,7 @@
                     <label>Typ</label>
                     <select wire:model.live="type">
                         <option value="attachment_name">Anhang-Dateiname enthält …</option>
+                        <option value="attachment_any">Irgendein Anhang vorhanden</option>
                         <option value="keyword">Stichwörter im Text (mit Mindestanzahl)</option>
                         <option value="birthdate">Geburtsdatum (Datum in der Vergangenheit)</option>
                         <option value="llm">Lokale KI-Prüfung (Sozialdaten-Erkennung)</option>
@@ -87,6 +88,8 @@
                 </div>
             @elseif ($type === 'llm')
                 <p class="muted" style="margin-top:10px;">Ein lokales KI-Modell auf dem Server prüft Betreff und Text auf schutzbedürftige Sozialdaten. Keine Begriffsliste nötig; die Mailinhalte verlassen den Server nicht. Bei Treffer wird der Score-Beitrag addiert.</p>
+            @elseif ($type === 'attachment_any')
+                <p class="muted" style="margin-top:10px;">Reagiert allein darauf, dass die Mail einen echten Dateianhang hat. Inline-Bilder (z. B. Logos in der Signatur) zählen nicht. Keine weiteren Angaben nötig.</p>
             @endif
             <div class="grid2" style="margin-top:10px;">
                 @if ($type === 'keyword')
