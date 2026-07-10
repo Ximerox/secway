@@ -34,7 +34,7 @@
             <button class="btn" style="margin-left:auto;" wire:click="newRule">Neue Regel</button>
         </div>
         <table style="margin-top:12px;">
-            <thead><tr><th>Name</th><th>Typ</th><th>Score</th><th>Status</th><th>Feuerte (90 T.)</th><th>„sicher" bestätigt</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Typ</th><th>Score</th><th>Status</th><th>Feuerte (90 T.)</th><th>löste Nachfrage aus</th><th></th></tr></thead>
             <tbody>
             @forelse ($rules as $r)
                 @php $s = $stats[$r->id] ?? null; @endphp
@@ -44,11 +44,7 @@
                     <td>+{{ $r->score }}</td>
                     <td>@if ($r->active)<span class="badge ok">aktiv</span>@else<span class="badge off">inaktiv</span>@endif</td>
                     <td class="muted">{{ $s['fired'] ?? 0 }}×</td>
-                    <td class="muted">
-                        @if ($s && $s['answered'] > 0)
-                            {{ round($s['secure'] / $s['answered'] * 100) }}% ({{ $s['secure'] }}/{{ $s['answered'] }})
-                        @else — @endif
-                    </td>
+                    <td class="muted">{{ $s['asked'] ?? 0 }}×</td>
                     <td style="text-align:right; white-space:nowrap;">
                         <button class="btn small ghost" wire:click="edit({{ $r->id }})">Bearbeiten</button>
                         <button class="btn small danger" wire:click="delete({{ $r->id }})" wire:confirm="Regel „{{ $r->name }}" löschen?">Löschen</button>
@@ -60,7 +56,7 @@
             </tbody>
         </table>
         <div class="muted" style="margin-top:8px;">
-            „sicher bestätigt" = Anteil der Fälle (mit Nutzerantwort), in denen der Absender nach dem Hinweis tatsächlich „sicher" wählte — die Trefferquote der Regel (wie beim Virenscanner). Niedrige Werte ⇒ Score/Schwellwert der Regel senken.
+            „Feuerte" = wie oft die Regel anschlug. „löste Nachfrage aus" = in wie vielen dieser Fälle die Gesamtwertung über dem Schwellwert lag und Outlook die Sende-Rückfrage zeigte. Eine „sicher bestätigt"-Quote lässt sich nicht mehr erfassen: Outlooks eingebaute Rückfrage meldet die Nutzerentscheidung nicht zurück.
         </div>
     </div>
 
@@ -125,9 +121,8 @@
             <tr><td>Prüfungen gesamt</td><td style="text-align:right;">{{ number_format($logSummary['total'], 0, ',', '.') }}</td></tr>
             <tr><td>davon gefragt</td><td style="text-align:right;">{{ number_format($logSummary['asked'], 0, ',', '.') }}</td></tr>
             <tr><td>ohne Frage (S/MIME-Ausnahme)</td><td style="text-align:right;">{{ number_format($logSummary['smime'], 0, ',', '.') }}</td></tr>
-            <tr><td>Nutzer wählte „sicher"</td><td style="text-align:right;">{{ number_format($logSummary['chosenSecure'], 0, ',', '.') }}</td></tr>
         </table>
-        <div class="muted" style="margin-top:8px;">Es werden nur Score, ausgelöste Regeln und die Nutzerwahl protokolliert — keine Betreffzeilen, Texte oder Anhangsnamen.</div>
+        <div class="muted" style="margin-top:8px;">Es werden nur Score und ausgelöste Regeln protokolliert — keine Betreffzeilen, Texte oder Anhangsnamen.</div>
     </div>
     <style>table.plain{width:100%;border-collapse:collapse;font-size:13.5px;} table.plain td{padding:5px 4px;border-bottom:1px solid #f0f1f3;}</style>
 </div>

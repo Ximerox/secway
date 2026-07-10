@@ -119,7 +119,11 @@ class SendRules extends Component
 
     public function render()
     {
-        // Precision-Auswertung pro Regel aus dem Standard-Log (ohne Inhalte)
+        // Auswertung pro Regel aus dem Standard-Log (ohne Inhalte): wie oft
+        // jede Regel angeschlagen hat bzw. eine Nachfrage ausgelöst hätte.
+        // Hinweis: Outlooks eingebaute Sende-Rückfrage meldet die Nutzerwahl
+        // nicht zurück (ein eigener Dialog ist im Sende-Ereignis nicht möglich)
+        // — eine „sicher bestätigt"-Quote lässt sich daher nicht mehr messen.
         $logs = SendClassifyLog::where('created_at', '>=', now()->subDays(90))->get();
         $stats = [];
         foreach ($logs as $log) {
@@ -128,13 +132,10 @@ class SendRules extends Component
                 if ($id === null) {
                     continue;
                 }
-                $stats[$id] ??= ['fired' => 0, 'secure' => 0, 'answered' => 0];
+                $stats[$id] ??= ['fired' => 0, 'asked' => 0];
                 $stats[$id]['fired']++;
-                if ($log->user_choice === 'secure') {
-                    $stats[$id]['secure']++;
-                }
-                if ($log->user_choice !== null) {
-                    $stats[$id]['answered']++;
+                if ($log->asked) {
+                    $stats[$id]['asked']++;
                 }
             }
         }
@@ -146,7 +147,6 @@ class SendRules extends Component
                 'total' => $logs->count(),
                 'asked' => $logs->where('asked', true)->count(),
                 'smime' => $logs->where('smime_covered', true)->count(),
-                'chosenSecure' => $logs->where('user_choice', 'secure')->count(),
             ],
         ]);
     }
