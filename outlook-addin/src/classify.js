@@ -16,17 +16,21 @@ const SECWAY_TOKEN = "REPLACE-WITH-MGW_CLASSIFY_TOKEN";
 function onMessageSendHandler(event) {
     const item = Office.context.mailbox.item;
 
-    // Sicherheitsnetz: egal was passiert (Hänger in einem Office-Callback,
-    // langsame Antwort, unerwarteter Fehler) — nach spätestens 8 s wird normal
-    // gesendet, damit Outlook nie in seinen eigenen Timeout-Dialog läuft.
+    // Sicherheitsnetz: NUR für die Phase Einsammeln + Klassifizieren (Office-
+    // Callbacks/API-Antwort). Nach spätestens 8 s wird normal gesendet, damit
+    // Outlook bei einem Hänger nie ewig „verarbeitet". WICHTIG: Sobald der
+    // Dialog gezeigt wird, MUSS der Wächter aus sein — sonst gibt er die Mail
+    // frei, während der Nutzer noch liest (Bug 10.07.: Score 90, gefragt, aber
+    // Mail ging nach 8 s ohne sichtbaren Dialog raus).
     let done = false;
     function finish(opts) {
         if (done) return;
         done = true;
         event.completed(opts);
     }
-    const watchdog = setTimeout(function () { finish({ allowEvent: true }); }, 8000);
-    function allow() { clearTimeout(watchdog); finish({ allowEvent: true }); }
+    let watchdog = setTimeout(function () { finish({ allowEvent: true }); }, 8000);
+    function disarm() { if (watchdog) { clearTimeout(watchdog); watchdog = null; } }
+    function allow() { disarm(); finish({ allowEvent: true }); }
 
     // fail-open: bei jedem unerwarteten Fehler normal senden
     try {
@@ -36,14 +40,16 @@ function onMessageSendHandler(event) {
                     allow();
                     return;
                 }
+                // Ab hier übernimmt der Dialog — Wächter sofort aus, sonst
+                // sendet er die Mail, bevor der Nutzer antworten kann.
+                disarm();
                 askUser(function (choice) {
                     reportChoice(verdict.logId, choice);
                     if (choice === "secure") {
                         const tag = verdict.tag || "####";
-                        clearTimeout(watchdog); // Nutzer entscheidet — Wächter aus
                         setTagThenSend(item, tag, function () { finish({ allowEvent: true }); });
                     } else {
-                        allow();
+                        finish({ allowEvent: true });
                     }
                 });
             });
