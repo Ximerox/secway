@@ -2,13 +2,19 @@
  * SecWay „Sicher versenden?" — OnMessageSend-Handler.
  *
  * Beim Senden: sammelt Betreff, Klartext-Body und Anhang-DATEINAMEN (keine
- * Bilder, keine Anhangsinhalte) sowie die Empfängeradressen, fragt SecWay, und
- * bietet dem Absender bei sensiblen Mails an, „sicher" zu versenden (Tag im
- * Betreff). Ist SecWay nicht erreichbar, wird ohne Nachfrage gesendet.
+ * Bilder, keine Anhangsinhalte) sowie die Empfängeradressen und fragt SecWay.
+ * Stuft SecWay die Mail als möglicherweise vertraulich ein, wird der Versand
+ * mit einer Hinweismeldung angehalten (Outlooks eingebaute „Smart Alerts"-
+ * Rückfrage: „Trotzdem senden" / „Nicht senden"). Ein EIGENER Dialog ist im
+ * Sende-Ereignis des neuen Outlook nicht möglich (displayDialogAsync scheitert
+ * mit Fehler 9032 — am 10.07.2026 nachgewiesen).
+ *
+ * Ist SecWay nicht erreichbar oder unauffällig, geht die Mail ohne Hinweis
+ * hinaus. Dieses Add-in erzwingt nichts — es erinnert nur.
  *
  * Konfiguration: die beiden Werte unten anpassen. TOKEN = MGW_CLASSIFY_TOKEN
- * aus der SecWay-.env (Hinweis: liegt clientseitig; für den Pilot vertretbar,
- * die API liefert nur ein Ja/Nein und protokolliert keine Inhalte).
+ * aus der SecWay-.env (liegt clientseitig; die API liefert nur ein Ja/Nein und
+ * protokolliert keine Mailinhalte).
  */
 const SECWAY_URL = "https://mailgateway.straphael.de";
 const SECWAY_TOKEN = "REPLACE-WITH-MGW_CLASSIFY_TOKEN";
@@ -16,12 +22,10 @@ const SECWAY_TOKEN = "REPLACE-WITH-MGW_CLASSIFY_TOKEN";
 function onMessageSendHandler(event) {
     const item = Office.context.mailbox.item;
 
-    // Sicherheitsnetz: NUR für die Phase Einsammeln + Klassifizieren (Office-
-    // Callbacks/API-Antwort). Nach spätestens 8 s wird normal gesendet, damit
-    // Outlook bei einem Hänger nie ewig „verarbeitet". WICHTIG: Sobald der
-    // Dialog gezeigt wird, MUSS der Wächter aus sein — sonst gibt er die Mail
-    // frei, während der Nutzer noch liest (Bug 10.07.: Score 90, gefragt, aber
-    // Mail ging nach 8 s ohne sichtbaren Dialog raus).
+    // Sicherheitsnetz NUR für Einsammeln + Klassifizieren (Office-Callbacks,
+    // API-Antwort): nach spätestens 8 s wird normal gesendet, damit ein Hänger
+    // nie zu Outlooks Endlos-„verarbeitet" führt. Sobald die Entscheidung fällt
+    // (senden oder anhalten), wird der Wächter abgeschaltet.
     let done = false;
     function finish(opts) {
         if (done) return;
@@ -36,21 +40,22 @@ function onMessageSendHandler(event) {
     try {
         collect(item, function (payload) {
             classify(payload, function (verdict) {
+                disarm();
                 if (!verdict || !verdict.ask) {
-                    allow();
+                    finish({ allowEvent: true });
                     return;
                 }
-                // Ab hier übernimmt der Dialog — Wächter sofort aus, sonst
-                // sendet er die Mail, bevor der Nutzer antworten kann.
-                disarm();
-                askUser(function (choice) {
-                    reportChoice(verdict.logId, choice);
-                    if (choice === "secure") {
-                        const tag = verdict.tag || "####";
-                        setTagThenSend(item, tag, function () { finish({ allowEvent: true }); });
-                    } else {
-                        finish({ allowEvent: true });
-                    }
+                // Möglicherweise vertraulich: Versand mit Hinweis anhalten.
+                // „Trotzdem senden" = ungeschützt raus; „Nicht senden" = zurück
+                // zum Entwurf, dann Betreff-Tag setzen und erneut senden.
+                const tag = verdict.tag || "####";
+                finish({
+                    allowEvent: false,
+                    errorMessage:
+                        "Diese Nachricht könnte vertrauliche Daten enthalten. " +
+                        "Für einen gesicherten, verschlüsselten Versand wählen Sie „Nicht senden“, " +
+                        "stellen Sie „" + tag + "“ an den Anfang des Betreffs und senden erneut. " +
+                        "Ist kein Schutz nötig, wählen Sie „Trotzdem senden“."
                 });
             });
         });
@@ -106,7 +111,7 @@ function gatherRecipients(item, done) {
 
 /* SecWay fragen; jeder Fehler/Timeout => senden (verdict.ask=false) */
 function classify(payload, done) {
-    const ctrl = ("AbortController" in window) ? new AbortController() : null;
+    const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
     if (ctrl) setTimeout(function () { ctrl.abort(); }, 4000);
     fetch(SECWAY_URL + "/api/classify", {
         method: "POST",
@@ -117,45 +122,6 @@ function classify(payload, done) {
         .then(function (r) { return r.ok ? r.json() : { ask: false }; })
         .then(function (j) { done(j); })
         .catch(function () { done({ ask: false }); });
-}
-
-function reportChoice(logId, choice) {
-    if (!logId) return;
-    fetch(SECWAY_URL + "/api/classify/" + logId + "/choice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SECWAY_TOKEN },
-        body: JSON.stringify({ choice: choice })
-    }).catch(function () { /* Feedback ist optional */ });
-}
-
-/* Neutrale Ja/Nein-Frage per Dialog */
-function askUser(done) {
-    let answered = false;
-    Office.context.ui.displayDialogAsync(
-        SECWAY_URL + "/addin/dialog.html",
-        { height: 32, width: 30, displayInIframe: true },
-        function (res) {
-            if (res.status !== "succeeded") { done("normal"); return; }
-            const dlg = res.value;
-            dlg.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
-                answered = true;
-                dlg.close();
-                done(arg.message === "secure" ? "secure" : "normal");
-            });
-            dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
-                if (!answered) done("normal"); // Dialog vom Nutzer geschlossen
-            });
-        }
-    );
-}
-
-/* Tag vorne in den Betreff setzen, dann senden */
-function setTagThenSend(item, tag, event) {
-    item.subject.getAsync(function (s) {
-        const cur = (s.status === "succeeded" && s.value) ? s.value : "";
-        const next = cur.indexOf(tag) === -1 ? (tag + " " + cur) : cur;
-        item.subject.setAsync(next, function () { event.completed({ allowEvent: true }); });
-    });
 }
 
 // Registrierung für das ereignisbasierte Runtime-Modell.
