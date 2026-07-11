@@ -66,12 +66,36 @@ class SendClassifier
         $hits = [];
         $breakdown = [];
         foreach (SendRule::where('active', true)->get() as $rule) {
-            $contribution = $this->evaluate($rule, $haystack, $names, $subject, $body);
+            $extra = [];
+            if ($rule->type === 'llm') {
+                // Beitrag = feste Punkte bei „sensibel = ja" PLUS Faktor (% aus
+                // dem threshold-Feld) auf den eigenen 0–100-Score des Modells.
+                // Beides 0 → die KI zählt nicht mit.
+                $verdict = $this->evaluateLlm($subject, $body);
+                $factor = max(0, (int) $rule->threshold);
+                $contribution = 0;
+                if ($verdict !== null) {
+                    if ($verdict['sensibel']) {
+                        $contribution += (int) $rule->score;
+                    }
+                    $contribution += (int) round($factor / 100 * $verdict['score']);
+                }
+                $extra = [
+                    'llm_available' => $verdict !== null,
+                    'llm_sensibel' => $verdict['sensibel'] ?? null,
+                    'llm_score' => $verdict['score'] ?? null,
+                    'llm_factor' => $factor,
+                ];
+            } else {
+                $contribution = $this->evaluate($rule, $haystack, $names, $subject, $body);
+            }
+
             // Vollständige Einzelwertung (auch 0) — für den Diagnose-Modus.
-            $breakdown[] = [
+            $breakdown[] = array_merge([
                 'id' => $rule->id, 'name' => $rule->name, 'type' => $rule->type,
                 'max' => $rule->score, 'contribution' => $contribution,
-            ];
+            ], $extra);
+
             if ($contribution > 0) {
                 $score += $contribution;
                 $hits[] = ['id' => $rule->id, 'name' => $rule->name, 'score' => $contribution];
@@ -92,22 +116,24 @@ class SendClassifier
             'attachment_any' => $attachmentNames !== [] ? $rule->score : 0,
             'keyword' => $this->countTerms($rule->termList(), $haystack) >= max(1, $rule->threshold) ? $rule->score : 0,
             'birthdate' => $this->hasPastDate($haystack, max(0, $rule->threshold)) ? $rule->score : 0,
-            'llm' => $this->evaluateLlm($subject, $body) ? $rule->score : 0,
-            default => 0,
+            default => 0, // 'llm' wird in classify() gesondert behandelt
         };
     }
 
     /**
-     * Lokaler LLM (llama.cpp): stuft die Mail als schutzbedürftig ein?
-     * Fail-safe: Bei Nichterreichbarkeit/Timeout/Fehler → false (kein Beitrag),
-     * damit die Klassifizierung nie am LLM hängen bleibt. Body gedeckelt, um
-     * die Latenz im Zeitbudget des Add-ins zu halten.
+     * Lokaler LLM (llama.cpp): liefert das Urteil des Modells als
+     * ['sensibel' => bool, 'score' => 0-100] — oder null, wenn der Dienst
+     * nicht erreichbar/fehlerhaft ist (Fail-safe: der Aufrufer wertet null
+     * als „kein Beitrag", die Klassifizierung hängt nie am LLM). Body
+     * gedeckelt, um die Latenz im Zeitbudget des Add-ins zu halten.
+     *
+     * @return array{sensibel: bool, score: int}|null
      */
-    private function evaluateLlm(string $subject, string $body): bool
+    private function evaluateLlm(string $subject, string $body): ?array
     {
         $endpoint = (string) config('mailgateway.llm_endpoint');
         if ($endpoint === '') {
-            return false;
+            return null;
         }
         try {
             $resp = Http::timeout((int) config('mailgateway.llm_timeout', 3))->post($endpoint, [
@@ -120,15 +146,21 @@ class SendClassifier
                 ],
             ]);
             if (! $resp->successful()) {
-                return false;
+                return null;
             }
             $verdict = json_decode((string) data_get($resp->json(), 'choices.0.message.content', ''), true);
+            if (! is_array($verdict)) {
+                return null;
+            }
 
-            return is_array($verdict) && ! empty($verdict['sensibel']);
+            return [
+                'sensibel' => ! empty($verdict['sensibel']),
+                'score' => max(0, min(100, (int) ($verdict['score'] ?? 0))),
+            ];
         } catch (\Throwable $e) {
             Log::warning('LLM-Klassifizierung nicht verfügbar', ['error' => $e->getMessage()]);
 
-            return false;
+            return null;
         }
     }
 

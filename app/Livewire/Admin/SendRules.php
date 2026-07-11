@@ -102,7 +102,7 @@ class SendRules extends Component
             'type' => 'in:attachment_name,attachment_any,keyword,birthdate,llm',
             'terms' => 'required_unless:type,birthdate,llm,attachment_any|nullable|string|max:5000',
             'rule_threshold' => 'required|integer|min:0|max:100',
-            'score' => 'required|integer|min:1|max:1000',
+            'score' => 'required|integer|min:0|max:1000',
         ], [
             'terms.required_unless' => 'Bitte Begriffe angeben (komma- oder zeilengetrennt).',
         ]);

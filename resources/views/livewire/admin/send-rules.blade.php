@@ -60,7 +60,18 @@
                             <tbody>
                             @foreach ($d->debug_rules ?? [] as $rr)
                                 <tr @if(($rr['contribution'] ?? 0) > 0) style="background:#fffbeb;" @endif>
-                                    <td>{{ $rr['name'] ?? $rr['type'] ?? '?' }} <span class="muted">({{ $rr['type'] ?? '' }})</span></td>
+                                    <td>
+                                        {{ $rr['name'] ?? $rr['type'] ?? '?' }} <span class="muted">({{ $rr['type'] ?? '' }})</span>
+                                        @if (($rr['type'] ?? '') === 'llm')
+                                            <br><span class="muted" style="font-size:12px;">
+                                            @if (($rr['llm_available'] ?? false))
+                                                KI-Urteil: <strong>{{ ($rr['llm_sensibel'] ?? false) ? 'ja (sensibel)' : 'nein' }}</strong>, KI-Wert {{ $rr['llm_score'] ?? '?' }}@if(($rr['llm_factor'] ?? 0) > 0) · Faktor {{ $rr['llm_factor'] }}%@endif
+                                            @else
+                                                KI-Dienst nicht verfügbar
+                                            @endif
+                                            </span>
+                                        @endif
+                                    </td>
                                     <td style="text-align:right;">@if(($rr['contribution'] ?? 0) > 0)<strong>+{{ $rr['contribution'] }}</strong>@else<span class="muted">0 / {{ $rr['max'] ?? '?' }}</span>@endif</td>
                                 </tr>
                             @endforeach
@@ -93,7 +104,7 @@
                 @php $s = $stats[$r->id] ?? null; @endphp
                 <tr>
                     <td><strong>{{ $r->name }}</strong></td>
-                    <td class="muted">{{ $r->typeLabel() }}{{ $r->type === 'keyword' ? ' (≥'.$r->threshold.')' : ($r->type === 'birthdate' ? ' (≥'.$r->threshold.' J.)' : '') }}</td>
+                    <td class="muted">{{ $r->typeLabel() }}@if($r->type === 'keyword') (≥{{ $r->threshold }})@elseif($r->type === 'birthdate') (≥{{ $r->threshold }} J.)@elseif($r->type === 'llm' && $r->threshold > 0) (+{{ $r->threshold }}% KI-Wert)@endif</td>
                     <td>+{{ $r->score }}</td>
                     <td>@if ($r->active)<span class="badge ok">aktiv</span>@else<span class="badge off">inaktiv</span>@endif</td>
                     <td class="muted">{{ $s['fired'] ?? 0 }}×</td>
@@ -140,7 +151,7 @@
                     @error('terms')<div class="error">{{ $message }}</div>@enderror
                 </div>
             @elseif ($type === 'llm')
-                <p class="muted" style="margin-top:10px;">Ein lokales KI-Modell auf dem Server prüft Betreff und Text auf schutzbedürftige Sozialdaten. Keine Begriffsliste nötig; die Mailinhalte verlassen den Server nicht. Bei Treffer wird der Score-Beitrag addiert.</p>
+                <p class="muted" style="margin-top:10px;">Ein lokales KI-Modell auf dem Server prüft Betreff und Text auf schutzbedürftige Sozialdaten (die Mailinhalte verlassen den Server nicht). Das Modell liefert ein Ja/Nein und einen eigenen Wert 0–100. Der Beitrag = <strong>feste Punkte bei „Ja"</strong> plus <strong>Faktor × KI-Wert</strong>. Beide Werte auf 0 ⇒ die KI zählt nicht mit.</p>
             @elseif ($type === 'attachment_any')
                 <p class="muted" style="margin-top:10px;">Reagiert allein darauf, dass die Mail einen echten Dateianhang hat. Inline-Bilder (z. B. Logos in der Signatur) zählen nicht. Keine weiteren Angaben nötig.</p>
             @endif
@@ -155,10 +166,16 @@
                         <label>Mindestalter des Datums (Jahre in der Vergangenheit)</label>
                         <input type="number" wire:model="rule_threshold" min="0" max="100">
                     </div>
+                @elseif ($type === 'llm')
+                    <div>
+                        <label>Faktor auf den KI-Wert (%)</label>
+                        <input type="number" wire:model="rule_threshold" min="0" max="100">
+                        <span class="muted" style="font-size:12px;">z.B. 50 ⇒ halber KI-Wert; 0 ⇒ KI-Wert ignorieren</span>
+                    </div>
                 @endif
                 <div>
-                    <label>Score-Beitrag bei Treffer</label>
-                    <input type="number" wire:model="score" min="1" max="1000">
+                    <label>{{ $type === 'llm' ? 'Punkte bei „Ja" (sensibel)' : 'Score-Beitrag bei Treffer' }}</label>
+                    <input type="number" wire:model="score" min="0" max="1000">
                     @error('score')<div class="error">{{ $message }}</div>@enderror
                 </div>
                 <div style="display:flex; align-items:flex-end;">
