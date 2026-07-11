@@ -26,6 +26,9 @@ class AuditEvent extends Model
         'sent_items_updated' => 'ausgehend',
         'sent_items_failed' => 'ausgehend',
         'passed_through' => 'ausgehend',
+        'send_override' => 'ausgehend',
+        'llm_secured' => 'ausgehend',
+        'llm_flagged' => 'ausgehend',
         'ingest_stored' => 'ausgehend',
         'recipient_notified' => 'ausgehend',
         'password_sent' => 'ausgehend',
@@ -57,6 +60,18 @@ class AuditEvent extends Model
     public function recipient()
     {
         return $this->belongsTo(MessageRecipient::class, 'message_recipient_id');
+    }
+
+    /** Alle Ereignisnamen, die explizit einer Richtung zugeordnet sind. */
+    public static function mappedEvents(): array
+    {
+        return array_keys(self::DIRECTIONS);
+    }
+
+    /** Explizit dieser Richtung zugeordnete Ereignisnamen (ohne Präfix-Regel). */
+    public static function eventsForDirection(string $direction): array
+    {
+        return array_keys(array_filter(self::DIRECTIONS, fn ($d) => $d === $direction));
     }
 
     /** eingehend / ausgehend / Portal / abgewiesen / System */
@@ -93,6 +108,17 @@ class AuditEvent extends Model
         }
         if ($this->event === 'smime_fallback') {
             return ['🔒 Verschlüsselung fehlgeschlagen → Portal', 'warn'];
+        }
+        if ($this->event === 'send_override') {
+            return ['⚠ ungesichert — trotz Warnung gesendet', 'warn'];
+        }
+        if ($this->event === 'llm_secured') {
+            return [($this->details['method'] ?? '') === 'smime'
+                ? '🔒 nachträglich verschlüsselt (KI-Prüfung)'
+                : '🔒 nachträglich ins Portal (KI-Prüfung)', 'crypt'];
+        }
+        if ($this->event === 'llm_flagged') {
+            return ['⚠ KI-Prüfung hätte abgesichert (Nur-Log-Modus)', 'warn'];
         }
         if ($this->event === 'cert_harvested') {
             return ['Zertifikat geerntet', 'ok'];

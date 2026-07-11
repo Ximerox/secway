@@ -4,13 +4,16 @@ namespace App\Console\Commands;
 
 use App\Mail\PasswordMail;
 use App\Mail\SecureLinkMail;
+use App\Mail\SenderSecuredNotice;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\MessageRecipient;
 use App\Models\SecureMessage;
+use App\Models\SendClassifyLog;
 use App\Models\SentItemsUpdate;
 use App\Models\Setting;
 use App\Models\SmimeCertificate;
+use App\Services\SendClassifier;
 use App\Services\SignatureMailService;
 use App\Services\SmimeInboundService;
 use App\Services\SmimeMailService;
@@ -208,6 +211,7 @@ class MailIngest extends Command
         $smime = [];
         $portalRcpts = [];
         $passRcpts = [];
+        $externalPlain = []; // externe Empfänger, die sonst unverschlüsselt rausgingen (rcpt => cert|null)
         foreach ($recipients as $rcpt) {
             if (! filter_var($rcpt, FILTER_VALIDATE_EMAIL)) {
                 Log::warning("mail:ingest {$queueId}: ungültige Empfängeradresse übersprungen: {$rcpt}");
@@ -230,8 +234,109 @@ class MailIngest extends Command
             } elseif ($hasTag) {
                 $portalRcpts[] = $rcpt;
             } else {
-                $passRcpts[] = $rcpt;
+                // Würde normal (unverschlüsselt) rausgehen — erst der nachgelagerten
+                // KI-Prüfung vorlegen (falls aktiviert), dann entscheiden.
+                $externalPlain[$rcpt] = $cert;
             }
+        }
+
+        // „Trotz Warnung gesendet": Hat das Add-in beim Verfassen gewarnt und der
+        // Mitarbeiter bewusst „Trotzdem senden" gewählt, trägt die Mail den Marker
+        // X-MGW-Send-Override (Wert „yes" oder — neuere Add-in-Version — die Log-ID
+        // der Klassifizierung). Das protokollieren wir IMMER (auch wenn die
+        // nachgelagerte Prüfung aus ist), damit im Protokoll sichtbar ist, dass
+        // hier bewusst ungesichert gesendet wurde. Header ist fälschbar (wie
+        // X-MGW-Signed) — Risiko akzeptabel; Marker wird beim Versand entfernt.
+        $override = trim((string) $parsed->getHeaderValue('X-MGW-Send-Override')) !== '';
+        if ($override && $externalPlain !== []) {
+            $ovDetails = [
+                'queue_id' => $queueId,
+                'sender' => $sender,
+                'recipients' => array_keys($externalPlain),
+                'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
+                'note' => 'Add-in hatte gewarnt — Absender wählte „Trotzdem senden" (ungesichert)',
+            ];
+            // Liefert das Add-in die Log-ID mit, reichern wir mit Score + den
+            // ausgelösten Regeln an und tragen die Nutzerwahl „normal" nach —
+            // Feedback für die Trefferquote pro Regel (sonst mangels Rück-Callback
+            // im Smart-Alerts-Dialog gar nicht messbar).
+            $classifyLogId = (int) trim((string) $parsed->getHeaderValue('X-MGW-Classify-Log'));
+            if ($classifyLogId > 0 && ($clog = SendClassifyLog::find($classifyLogId)) !== null) {
+                $ovDetails['classify_score'] = $clog->score;
+                $ovDetails['rules'] = array_values(array_map(
+                    fn ($h) => $h['name'] ?? '?',
+                    is_array($clog->rule_hits) ? $clog->rule_hits : []
+                ));
+                if ($clog->user_choice === null) {
+                    $clog->update(['user_choice' => 'normal']);
+                }
+            }
+            AuditEvent::log('send_override', details: $ovDetails);
+        }
+
+        // Nachgelagerte KI-Prüfung („gutes" Modell): Nur wenn aktiviert und es
+        // tatsächlich Mail gibt, die sonst unverschlüsselt an Externe ginge.
+        // Modus 'log': nur protokollieren, was abgesichert WORDEN WÄRE (zum
+        // Kalibrieren des Schwellwerts im Echtbetrieb, ohne einzugreifen).
+        // Modus 'secure': bei hohem Score nachträglich absichern (Zertifikat →
+        // S/MIME, sonst → Portal) und den Absender informieren. Der bewusste
+        // Override hat Vorrang (überstimmt den Menschen nicht). Fail-safe:
+        // Dienst weg / unter Schwelle → alles bleibt beim normalen Durchleiten.
+        $llmMode = Setting::llmReviewMode();
+        if ($externalPlain !== [] && $llmMode !== 'off') {
+            $verdict = $override ? null : $this->reviewOutbound($parsed);
+            $threshold = (int) Setting::get('llm_review_score', 70);
+            if ($verdict !== null && $verdict['score'] >= $threshold) {
+                if ($llmMode === 'log') {
+                    AuditEvent::log('llm_flagged', details: [
+                        'queue_id' => $queueId,
+                        'sender' => $sender,
+                        'recipients' => array_keys($externalPlain),
+                        'llm_score' => $verdict['score'],
+                        'threshold' => $threshold,
+                        'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
+                        'note' => 'Nur-Log-Modus — Mail wurde NICHT umgeleitet',
+                    ]);
+                } else {
+                    $securedPortal = [];
+                    $securedSmime = [];
+                    foreach ($externalPlain as $rcpt => $cert) {
+                        if ($cert) {
+                            $smime[$rcpt] = $cert;
+                            $securedSmime[] = $rcpt;
+                        } else {
+                            $portalRcpts[] = $rcpt;
+                            $securedPortal[] = $rcpt;
+                        }
+                    }
+                    $externalPlain = []; // vollständig umgeleitet
+                    $secured = array_merge($securedSmime, $securedPortal);
+                    AuditEvent::log('llm_secured', details: [
+                        'queue_id' => $queueId,
+                        'sender' => $sender,
+                        'recipients' => $secured,
+                        'llm_score' => $verdict['score'],
+                        'threshold' => $threshold,
+                        'method' => $securedPortal !== [] ? 'portal' : 'smime',
+                        'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
+                    ]);
+                    if (InternalDomains::isInternal($sender)) {
+                        try {
+                            Mail::to($sender)->send(new SenderSecuredNotice(
+                                (string) $this->cleanSubject((string) $parsed->getSubject()),
+                                $secured,
+                                $securedPortal !== [] ? 'portal' : 'smime',
+                            ));
+                        } catch (Throwable $e) {
+                            Log::warning("mail:ingest {$queueId}: Absender-Info fehlgeschlagen: ".$e->getMessage());
+                        }
+                    }
+                }
+            }
+        }
+        // Nicht abgesicherte externe Empfänger gehen normal durch.
+        foreach (array_keys($externalPlain) as $rcpt) {
+            $passRcpts[] = $rcpt;
         }
 
         if ($inboundRcpts !== []) {
@@ -283,6 +388,23 @@ class MailIngest extends Command
         }
 
         return self::EX_OK;
+    }
+
+    /**
+     * Legt Betreff + Text der ausgehenden Mail dem nachgelagerten Modell vor.
+     * Text bevorzugt, sonst aus HTML gestrippt. null = Dienst nicht verfügbar.
+     *
+     * @return array{sensibel: bool, score: int}|null
+     */
+    private function reviewOutbound(Message $parsed): ?array
+    {
+        $body = $parsed->getTextContent();
+        if ($body === null || trim($body) === '') {
+            $html = (string) $parsed->getHtmlContent();
+            $body = $html !== '' ? trim(html_entity_decode(strip_tags($html))) : '';
+        }
+
+        return app(SendClassifier::class)->reviewSensitive((string) $parsed->getSubject(), (string) $body);
     }
 
     private function findOrStoreMessage(string $queueId, string $sender, string $raw, Message $parsed): SecureMessage

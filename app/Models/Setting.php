@@ -43,6 +43,21 @@ class Setting extends Model
         return (string) self::get('operator_name', config('mailgateway.operator_name'));
     }
 
+    /**
+     * Modus der nachgelagerten KI-Prüfung: 'off' | 'log' | 'secure'.
+     * Fällt auf den früheren Bool-Schalter llm_review_enabled zurück
+     * (an = 'secure'), solange llm_review_mode noch nie gespeichert wurde.
+     */
+    public static function llmReviewMode(): string
+    {
+        $mode = self::get('llm_review_mode');
+        if (in_array($mode, ['off', 'log', 'secure'], true)) {
+            return $mode;
+        }
+
+        return self::getBool('llm_review_enabled', false) ? 'secure' : 'off';
+    }
+
     public static function set(string $key, mixed $value): void
     {
         $value = is_bool($value) ? (string) (int) $value : (string) $value;

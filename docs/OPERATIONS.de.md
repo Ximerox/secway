@@ -13,11 +13,12 @@ um 2:30 Uhr automatisch.
 
 | Seite | Zweck |
 |---|---|
-| **Statistik** | Startseite: Mailvolumen nach Versandweg, Abrufquote, Top-Domains, ablaufende Zertifikate |
+| **Statistik** | Startseite: Mailvolumen nach Versandweg, Abrufquote, Top-Domains, Sicher-versenden-/KI-Prüfungs-Kennzahlen, ablaufende Zertifikate |
 | **Nachrichten** | Im Portal wartende Mails — pro Nachricht *Erinnern* und *Löschen* |
 | **Warteschlange** | Postfix-Queue live mit Fehlergrund — *Erneut zustellen* / *Löschen*; darunter wartende Kennwort-Mails mit *Jetzt senden* |
 | **Protokoll** | Alle Ereignisse, nach Vorgang gruppiert, mit Richtung/Von/An, filter- und durchsuchbar |
-| **Zertifikate** | Eigene und Partner-Zertifikate, Upload, geerntete Zertifikate |
+| **Zertifikate** | Eigene und Partner-Zertifikate (umschaltbare Tabs, Spalten sortierbar), Upload, Export, geerntete Zertifikate |
+| **Sicher versenden** | Regeln und Schwellwert für die Sende-Rückfrage im Outlook-Add-in, Diagnose-/Lernmodus, nachgelagerte KI-Prüfung (Modus + Schwellwert) |
 | **Signaturblöcke** | Modul-Schalter, Vorlagen (eigene Editor-Seite mit Tabs), Bilder & QR — serverseitige E-Mail-Fußzeilen aus Entra-Daten |
 | **Benutzer** | Aus Entra ID synchronisierte Benutzer (Cache), Sync-Filter, „Jetzt synchronisieren" |
 | **Einstellungen** | Alles Konfigurierbare inkl. Betreibername und Impressum/Datenschutz |
@@ -110,11 +111,17 @@ Betriebssystem-Sicherheitsupdates installiert `unattended-upgrades` automatisch;
   inaktiv, ist es selbstsigniert/privat — dann bewusst manuell unter Admin → Zertifikate
   freigeben.
 - **Lokale KI-Prüfung (optional):** Ein llama.cpp-Dienst (`llm-classify.service`, nur localhost:8081,
-  Modell Qwen2.5-7B) bewertet ausgehende Mails auf schutzbedürftige Sozialdaten. Aktiviert über eine
-  Send-Regel vom Typ „Lokale KI-Prüfung" (Admin → Sicher versenden). Fail-safe: Ist der Dienst aus,
-  trägt die Regel 0 bei, die Klassifizierung läuft normal weiter. Stoppen/Starten:
-  `systemctl {stop|start} llm-classify`. Ressourcengrenzen (8 Kerne/7 GB) in der systemd-Unit — der
-  Mailbetrieb hat Vorrang. Die Mailinhalte verlassen den Server nicht.
+  Modell Qwen2.5-7B) bewertet ausgehende Mails auf schutzbedürftige Sozialdaten. Zwei Einsatzorte
+  (beide Admin → Sicher versenden): **(a)** als Send-Regel vom Typ „Lokale KI-Prüfung" — zählt zum
+  Score der Sende-Rückfrage im Add-in; **(b)** als **nachgelagerte KI-Prüfung** im Gateway: Würde
+  eine Mail unverschlüsselt an Externe gehen, prüft das Modell noch einmal. Drei Modi: *Aus*,
+  *Nur Log* (protokolliert als `llm_flagged`, was abgesichert worden wäre — zum Kalibrieren des
+  Schwellwerts) und *Log und Absichern* (leitet ab Schwellwert wirklich um: Zertifikat → S/MIME,
+  sonst → Portal, Absender bekommt eine Info-Mail; Protokoll `llm_secured`). Ein bewusstes
+  „Trotzdem senden" im Add-in wird respektiert (Protokoll `send_override`). Fail-safe: Ist der
+  Dienst aus, trägt die Regel 0 bei bzw. die Mail wird normal zugestellt — kein Mailstau.
+  Stoppen/Starten: `systemctl {stop|start} llm-classify`. Ressourcengrenzen (8 Kerne/7 GB) in der
+  systemd-Unit — der Mailbetrieb hat Vorrang. Die Mailinhalte verlassen den Server nicht.
 - **Impressum/Datenschutz ändern:** Admin → Einstellungen → HTML-Felder unten.
 - **Eigenes Kennwort / Benutzername ändern:** Admin → Konto.
 - **Weiteren Admin-Benutzer anlegen:** per Tinker (siehe INSTALL.md, „First admin user").

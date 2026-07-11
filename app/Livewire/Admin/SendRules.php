@@ -23,6 +23,11 @@ class SendRules extends Component
 
     public bool $debug = false;
 
+    // Nachgelagerte KI-Prüfung (Gateway, unabhängig vom Add-in)
+    public string $llm_mode = 'off';
+
+    public int $llm_score = 70;
+
     // Regel-Editor
     public ?int $editId = null;
 
@@ -44,18 +49,27 @@ class SendRules extends Component
         $this->threshold = (int) Setting::get('classify_threshold', 60);
         $this->smime_exception = Setting::getBool('classify_smime_exception', true);
         $this->debug = Setting::getBool('classify_debug', false);
+        $this->llm_mode = Setting::llmReviewMode();
+        $this->llm_score = (int) Setting::get('llm_review_score', 70);
     }
 
     public function saveSettings(): void
     {
-        $this->validate(['threshold' => 'required|integer|min:1|max:1000']);
+        $this->validate([
+            'threshold' => 'required|integer|min:1|max:1000',
+            'llm_mode' => 'required|in:off,log,secure',
+            'llm_score' => 'required|integer|min:1|max:100',
+        ]);
         Setting::set('classify_enabled', $this->enabled);
         Setting::set('classify_threshold', $this->threshold);
         Setting::set('classify_smime_exception', $this->smime_exception);
         Setting::set('classify_debug', $this->debug);
+        Setting::set('llm_review_mode', $this->llm_mode);
+        Setting::set('llm_review_score', $this->llm_score);
         AuditEvent::log('settings_changed', ip: request()->ip(), details: [
             'classify_enabled' => $this->enabled, 'classify_threshold' => $this->threshold,
             'classify_debug' => $this->debug,
+            'llm_review_mode' => $this->llm_mode, 'llm_review_score' => $this->llm_score,
         ]);
         session()->flash('ok', 'Einstellungen gespeichert.'.($this->debug ? ' Diagnose-Modus AKTIV — speichert Mailinhalte!' : ''));
     }

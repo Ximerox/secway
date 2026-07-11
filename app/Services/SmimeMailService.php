@@ -108,6 +108,8 @@ class SmimeMailService
             strtolower((string) config('mailgateway.secret_header')),
             'x-mgw-notification',
             'x-mgw-signed', // interner Marker des Compose-Add-ins, nie zum Empfänger
+            'x-mgw-send-override', // interner Marker „bewusst normal senden", nie zum Empfänger
+            'x-mgw-classify-log', // interne Log-ID der Add-in-Klassifizierung, nie zum Empfänger
             'bcc',
         ];
         $keep = [];
@@ -152,6 +154,8 @@ class SmimeMailService
             strtolower((string) config('mailgateway.secret_header')),
             'x-mgw-notification',
             'x-mgw-signed', // interner Marker des Compose-Add-ins, nie zum Empfänger
+            'x-mgw-send-override', // interner Marker „bewusst normal senden", nie zum Empfänger
+            'x-mgw-classify-log', // interne Log-ID der Add-in-Klassifizierung, nie zum Empfänger
         ];
         $keep = [];
         foreach (RawMail::headerLines($headerBlock) as $line) {

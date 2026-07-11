@@ -5,35 +5,71 @@
     @if (session('ok'))<div class="alert ok">{{ session('ok') }}</div>@endif
     @if (session('err'))<div class="alert err">{{ session('err') }}</div>@endif
 
-    <div class="card">
-        <h2 style="margin-top:0;">Einstellungen</h2>
-        <form wire:submit="saveSettings">
-            <label style="display:flex; gap:8px; align-items:center; margin:0;">
-                <input type="checkbox" wire:model="enabled" style="width:auto;"> Modul aktiv (Add-in fragt SecWay)
+    <form wire:submit="saveSettings">
+        <div class="card">
+            <h2 style="margin-top:0;">Sende-Rückfrage im Outlook-Add-in</h2>
+
+            <label class="opt">
+                <input type="checkbox" wire:model="enabled">
+                <span>
+                    <strong>Modul aktiv (Add-in fragt SecWay)</strong><br>
+                    <span class="muted">Beim Senden prüft das Add-in die Mail gegen die Regeln unten. Liegt der Gesamt-Score über dem Schwellwert, zeigt Outlook die Rückfrage „Sicher versenden?".</span>
+                </span>
             </label>
-            <div class="grid2" style="margin-top:10px;">
+
+            <div class="grid2" style="margin-top:14px;">
                 <div>
-                    <label>Schwellwert (ab diesem Gesamt-Score wird gefragt)</label>
-                    <input type="number" wire:model="threshold" min="1" max="1000">
+                    <label>Schwellwert (Gesamt-Score, ab dem gefragt wird)</label>
+                    <input type="number" wire:model="threshold" min="1" max="1000" style="max-width:120px;">
                     @error('threshold')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">Die Score-Beiträge aller zutreffenden Regeln werden addiert und gegen diesen Wert geprüft.</p>
                 </div>
-                <div style="display:flex; align-items:flex-end;">
-                    <label style="display:flex; gap:8px; align-items:center; margin:0;">
-                        <input type="checkbox" wire:model="smime_exception" style="width:auto;">
-                        Nicht fragen, wenn alle Empfänger ein S/MIME-Zertifikat haben (wird ohnehin verschlüsselt)
+                <div>
+                    <label class="opt" style="margin-top:0;">
+                        <input type="checkbox" wire:model="smime_exception">
+                        <span>
+                            <strong>S/MIME-Ausnahme</strong><br>
+                            <span class="muted">Nicht fragen, wenn alle Empfänger ein S/MIME-Zertifikat haben — die Mail wird ohnehin verschlüsselt.</span>
+                        </span>
                     </label>
                 </div>
             </div>
-            <label style="display:flex; gap:8px; align-items:flex-start; margin:14px 0 0;">
-                <input type="checkbox" wire:model="debug" style="width:auto; margin-top:3px;">
+
+            <label class="opt" style="margin-top:14px;">
+                <input type="checkbox" wire:model="debug">
                 <span>
-                    <strong>Diagnose-/Lernmodus</strong> — speichert zu jeder geprüften Mail den <strong>kompletten Text</strong>, die Anhang-Namen und die Einzelwertung jeder Regel, um nachzuvollziehen, warum (nicht) gefragt wurde.
-                    <span class="muted" style="display:block;">Achtung: Dabei werden echte Mailinhalte (ggf. mit Sozialdaten) in der Datenbank gespeichert. Nur zur zeitlich begrenzten Analyse aktivieren und danach wieder ausschalten sowie die Inhalte löschen.</span>
+                    <strong>Diagnose-/Lernmodus</strong><br>
+                    <span class="muted">Speichert zu jeder geprüften Mail den <strong>kompletten Text</strong>, die Anhang-Namen und die Einzelwertung jeder Regel, um nachzuvollziehen, warum (nicht) gefragt wurde. Achtung: echte Mailinhalte (ggf. mit Sozialdaten) landen in der Datenbank — nur zur zeitlich begrenzten Analyse aktivieren, danach ausschalten und Inhalte löschen.</span>
                 </span>
             </label>
-            <button type="submit" class="btn">Einstellungen speichern</button>
-        </form>
-    </div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-top:0;">Nachgelagerte KI-Prüfung (Gateway)</h2>
+            <p class="muted" style="margin-top:-4px;">Unabhängig vom Add-in: Würde eine Mail <strong>unverschlüsselt an externe Empfänger</strong> gehen, prüft das lokale „gute" Modell (7B, nur auf diesem Server, kein Datenabfluss) noch einmal auf schutzbedürftige Inhalte. Der bewusste „Trotzdem senden"-Override im Add-in wird respektiert. Fällt der KI-Dienst aus, wird normal zugestellt (kein Mailstau).</p>
+
+            <div class="grid2" style="margin-top:14px;">
+                <div>
+                    <label>Modus</label>
+                    <select wire:model="llm_mode" style="max-width:360px;">
+                        <option value="off">Aus — keine nachgelagerte Prüfung</option>
+                        <option value="log">Nur Log — prüfen und protokollieren, Mail geht normal raus</option>
+                        <option value="secure">Log und Absichern — ab Schwellwert umleiten (S/MIME oder Portal)</option>
+                    </select>
+                    @error('llm_mode')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">„Nur Log" eignet sich zum Kalibrieren: Im Protokoll erscheint <em>llm_flagged</em> für jede Mail, die abgesichert worden wäre. „Log und Absichern" leitet ab Schwellwert wirklich um (Zertifikat vorhanden → S/MIME, sonst → Portal) und informiert den Absender per Mail.</p>
+                </div>
+                <div>
+                    <label>Schwellwert (KI-Score 1–100, ab dem reagiert wird)</label>
+                    <input type="number" wire:model="llm_score" min="1" max="100" style="max-width:120px;">
+                    @error('llm_score')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">Höher = strenger (weniger Fehlalarme, mehr Durchlass). Richtwert 70 — das Modell trennt im Test sauber: harmlose Mails 0, schutzbedürftige 85–100.</p>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn" style="margin:-6px 0 18px;">Einstellungen speichern</button>
+    </form>
 
     @if ($debug || $debugLogs->isNotEmpty())
         <div class="card" style="border:1px solid #fde68a;">

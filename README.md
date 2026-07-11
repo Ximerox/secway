@@ -87,9 +87,16 @@ S/MIME **signing** above.
   placeholders, rules, inline images, per-sender QR codes and optional Sent-Items update
 - **„Send securely?" Outlook add-in** (optional) — an OnMessageSend add-in that scores
   outbound mail against admin-managed rules (sensitive attachment names, keyword thresholds,
-  past-dated birthdates) and prompts the sender to tag it for secure delivery; content stays
-  local (only subject/body/attachment-names sent), scoring + rule-precision logged without
-  message content. Backend under `/api/classify`, add-in in `outlook-addin/`.
+  past-dated birthdates, local-LLM verdict) and prompts the sender to tag it for secure
+  delivery; content stays local (only subject/body/attachment-names sent), scoring +
+  rule-precision logged without message content. Backend under `/api/classify`, add-in in
+  `outlook-addin/`.
+- **Post-hoc LLM review** (optional) — mail that would otherwise leave unencrypted to external
+  recipients is re-checked at the gateway by a **local** llama.cpp model (no data leaves the
+  server). Three modes: off, log-only (records what would have been secured — for threshold
+  calibration), and secure (reroutes to S/MIME or portal above the threshold and notifies the
+  sender). A deliberate "send anyway" override from the add-in is always respected; if the LLM
+  service is down, mail passes through normally (fail-safe, no queue buildup).
 
 ## Requirements
 

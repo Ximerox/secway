@@ -95,11 +95,37 @@
                 <span class="badge off" style="margin-left:6px;">Modul aus</span>
             @endif
             <table class="plain">
-                <tr><td>Signaturblöcke angehängt</td><td class="mono" style="text-align:right;">{{ number_format($sigApplied, 0, ',', '.') }}</td></tr>
+                <tr><td>Signaturblöcke angehängt (Gateway)</td><td class="mono" style="text-align:right;">{{ number_format($sigApplied, 0, ',', '.') }}</td></tr>
+                <tr><td>im Client angefügt (Compose-Add-in)</td><td class="mono" style="text-align:right;">{{ number_format($sigClient, 0, ',', '.') }}</td></tr>
                 <tr><td>übersprungen (S/MIME, Kalender, …)</td><td class="mono" style="text-align:right;">{{ number_format($sigSkipped, 0, ',', '.') }}</td></tr>
                 <tr><td>Postausgang aktualisiert</td><td class="mono" style="text-align:right;">{{ number_format($sentItemsUpdated, 0, ',', '.') }}</td></tr>
                 <tr><td>Fehler bei der Verarbeitung</td><td class="mono" style="text-align:right;">{{ $sigFailed > 0 ? '⚠ ' : '' }}{{ number_format($sigFailed, 0, ',', '.') }}</td></tr>
                 <tr><td>aktive Vorlagen</td><td class="mono" style="text-align:right;"><a href="{{ route('admin.signatures') }}">{{ number_format($sigActiveTemplates, 0, ',', '.') }}</a></td></tr>
+            </table>
+        </div>
+
+        {{-- Sicher versenden & KI-Prüfung --}}
+        <div class="card">
+            <strong>Sicher versenden &amp; KI-Prüfung</strong>
+            @if ($clsEnabled)
+                <span class="badge ok" style="margin-left:6px;">Add-in aktiv</span>
+            @else
+                <span class="badge off" style="margin-left:6px;">Add-in aus</span>
+            @endif
+            @if ($llmMode === 'secure')
+                <span class="badge ok">KI: absichern</span>
+            @elseif ($llmMode === 'log')
+                <span class="badge warn">KI: nur Log</span>
+            @else
+                <span class="badge off">KI aus</span>
+            @endif
+            <table class="plain">
+                <tr><td>Add-in-Prüfungen beim Senden</td><td class="mono" style="text-align:right;">{{ number_format($clsChecks, 0, ',', '.') }}</td></tr>
+                <tr><td>davon Rückfrage „Sicher versenden?"</td><td class="mono" style="text-align:right;">{{ number_format($clsAsked, 0, ',', '.') }}</td></tr>
+                <tr><td>trotz Warnung ungesichert gesendet</td><td class="mono" style="text-align:right;">{{ $clsOverrides > 0 ? '⚠ ' : '' }}{{ number_format($clsOverrides, 0, ',', '.') }}</td></tr>
+                <tr><td>von KI-Prüfung nachträglich abgesichert</td><td class="mono" style="text-align:right;">{{ number_format($llmSecured, 0, ',', '.') }}</td></tr>
+                <tr><td>KI hätte abgesichert (Nur-Log-Modus)</td><td class="mono" style="text-align:right;">{{ number_format($llmFlagged, 0, ',', '.') }}</td></tr>
+                <tr><td>Regeln &amp; Einstellungen</td><td class="mono" style="text-align:right;"><a href="{{ route('admin.sendrules') }}">öffnen</a></td></tr>
             </table>
         </div>
 

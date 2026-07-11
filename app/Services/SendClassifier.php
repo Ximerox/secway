@@ -131,12 +131,41 @@ class SendClassifier
      */
     private function evaluateLlm(string $subject, string $body): ?array
     {
-        $endpoint = (string) config('mailgateway.llm_endpoint');
+        return $this->callLlm(
+            (string) config('mailgateway.llm_endpoint'),
+            (int) config('mailgateway.llm_timeout', 3),
+            $subject,
+            $body,
+        );
+    }
+
+    /**
+     * Nachgelagerte Zweitmeinung durch das „gute" (größere) Modell auf einem
+     * eigenen Endpunkt. Wird vom Gateway (MailIngest) auf Mails angewandt, die
+     * sonst unverschlüsselt rausgingen — bei hohem Score sichert das Gateway
+     * die Mail nachträglich ab. Gleicher Fail-safe wie evaluateLlm: null =
+     * Dienst weg → keine Aktion, die Zustellung hängt nie am LLM.
+     *
+     * @return array{sensibel: bool, score: int}|null
+     */
+    public function reviewSensitive(string $subject, string $body): ?array
+    {
+        return $this->callLlm(
+            (string) config('mailgateway.llm_review_endpoint'),
+            (int) config('mailgateway.llm_review_timeout', 6),
+            $subject,
+            $body,
+        );
+    }
+
+    /** Gemeinsamer LLM-Aufruf für Add-in-Prüfung und nachgelagerte Zweitmeinung. */
+    private function callLlm(string $endpoint, int $timeout, string $subject, string $body): ?array
+    {
         if ($endpoint === '') {
             return null;
         }
         try {
-            $resp = Http::timeout((int) config('mailgateway.llm_timeout', 3))->post($endpoint, [
+            $resp = Http::timeout(max(1, $timeout))->post($endpoint, [
                 'temperature' => 0,
                 'max_tokens' => 24,
                 'response_format' => ['type' => 'json_object'],

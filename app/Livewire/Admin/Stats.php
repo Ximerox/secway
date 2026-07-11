@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Models\AuditEvent;
 use App\Models\MessageRecipient;
 use App\Models\SecureMessage;
+use App\Models\SendClassifyLog;
 use App\Models\Setting;
 use App\Models\SignatureTemplate;
 use App\Models\SmimeCertificate;
@@ -110,11 +111,19 @@ class Stats extends Component
             'topRecipientDomains' => array_slice($topRecipientDomains, 0, 8, true),
             'topSenders' => array_slice($topSenders, 0, 8, true),
             'sigApplied' => $countEvent(['signature_applied']),
+            'sigClient' => $countEvent(['signature_client']),
             'sigSkipped' => $countEvent(['signature_skipped']),
             'sigFailed' => $countEvent(['signature_failed']),
             'sentItemsUpdated' => $countEvent(['sent_items_updated']),
             'sigEnabled' => Setting::getBool('signature_enabled', false),
             'sigActiveTemplates' => SignatureTemplate::where('active', true)->count(),
+            'clsEnabled' => Setting::getBool('classify_enabled', false),
+            'clsChecks' => SendClassifyLog::where('created_at', '>=', $from)->count(),
+            'clsAsked' => SendClassifyLog::where('created_at', '>=', $from)->where('asked', true)->count(),
+            'clsOverrides' => $countEvent(['send_override']),
+            'llmMode' => Setting::llmReviewMode(),
+            'llmSecured' => $countEvent(['llm_secured']),
+            'llmFlagged' => $countEvent(['llm_flagged']),
             'storeCount' => SecureMessage::count(),
             'storeBytes' => (int) SecureMessage::sum('size_bytes'),
             'unviewedNow' => MessageRecipient::whereNull('first_viewed_at')->count(),

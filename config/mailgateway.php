@@ -78,4 +78,11 @@ return [
     'llm_endpoint' => env('MGW_LLM_ENDPOINT', 'http://127.0.0.1:8081/v1/chat/completions'),
     'llm_timeout' => env('MGW_LLM_TIMEOUT', 3),
 
+    // Nachgelagerte Zweitmeinung durch das größere Modell (eigener llama.cpp-
+    // Dienst, nur localhost). Wird im Gateway auf ausgehende Mail angewandt, die
+    // sonst unverschlüsselt rausginge — Modus über das Admin-Setting
+    // „llm_review_mode" (off/log/secure). Timeout großzügiger, da nicht im Add-in-Pfad.
+    'llm_review_endpoint' => env('MGW_LLM_REVIEW_ENDPOINT', 'http://127.0.0.1:8082/v1/chat/completions'),
+    'llm_review_timeout' => env('MGW_LLM_REVIEW_TIMEOUT', 9),
+
 ];
