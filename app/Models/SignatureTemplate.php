@@ -65,11 +65,27 @@ class SignatureTemplate extends Model
     /** @param  array<int, string>  $recipients */
     public function recipientsMatch(array $recipients): bool
     {
-        $eligible = array_filter($recipients, fn ($r) => match ($this->direction) {
-            'external' => ! InternalDomains::isInternal($r),
-            'internal' => InternalDomains::isInternal($r),
-            default => true,
-        });
+        $recipients = array_values(array_filter(array_map('strval', $recipients)));
+
+        // Richtungs-Logik so, dass GEMISCHTE Mails genau eine Signatur bekommen:
+        //  - „extern"  greift, sobald mindestens ein externer Empfänger dabei ist
+        //  - „intern"  greift NUR, wenn ALLE Empfänger intern sind (kein externer)
+        // Damit schließen sich intern/extern bei gemischten Empfängern aus; die
+        // gemischte Mail erhält die externe Signatur (das eine Mail-Objekt geht
+        // ohnehin identisch an alle Empfänger).
+        $hasExternal = false;
+        foreach ($recipients as $r) {
+            if (! InternalDomains::isInternal($r)) {
+                $hasExternal = true;
+                break;
+            }
+        }
+
+        $eligible = match ($this->direction) {
+            'external' => array_filter($recipients, fn ($r) => ! InternalDomains::isInternal($r)),
+            'internal' => $hasExternal ? [] : $recipients,
+            default => $recipients,
+        };
 
         $include = self::parseList($this->recipient_include);
         if ($include !== []) {
