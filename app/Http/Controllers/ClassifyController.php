@@ -51,14 +51,27 @@ class ClassifyController extends Controller
             return response()->json(['ask' => false, 'reason' => 'internal_only']);
         }
 
-        $log = SendClassifyLog::create([
+        $entry = [
             'score' => $r['score'],
             'asked' => $r['ask'],
             'rule_hits' => $r['hits'],
             'recipient_count' => $r['recipientCount'],
             'external_count' => $r['externalCount'],
             'smime_covered' => $r['smimeCovered'],
-        ]);
+        ];
+
+        // Diagnose-/Lernmodus (bewusst aktivierbar): kompletter Text, Anhang-
+        // namen und die Einzelwertung ALLER Regeln mitschreiben, um zu sehen,
+        // warum eine Mail (nicht) über der Schwelle lag. Enthält echten
+        // Mailinhalt — nur im Admin sichtbar, jederzeit löschbar.
+        if (Setting::getBool('classify_debug', false)) {
+            $entry['debug_subject'] = mb_substr((string) ($data['subject'] ?? ''), 0, 2000);
+            $entry['debug_body'] = mb_substr((string) ($data['body'] ?? ''), 0, 20000);
+            $entry['debug_attachments'] = array_values($data['attachments'] ?? []);
+            $entry['debug_rules'] = $r['breakdown'];
+        }
+
+        $log = SendClassifyLog::create($entry);
 
         return response()->json([
             'ask' => $r['ask'],

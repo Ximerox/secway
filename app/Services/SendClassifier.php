@@ -64,15 +64,21 @@ class SendClassifier
 
         $score = 0;
         $hits = [];
+        $breakdown = [];
         foreach (SendRule::where('active', true)->get() as $rule) {
             $contribution = $this->evaluate($rule, $haystack, $names, $subject, $body);
+            // Vollständige Einzelwertung (auch 0) — für den Diagnose-Modus.
+            $breakdown[] = [
+                'id' => $rule->id, 'name' => $rule->name, 'type' => $rule->type,
+                'max' => $rule->score, 'contribution' => $contribution,
+            ];
             if ($contribution > 0) {
                 $score += $contribution;
                 $hits[] = ['id' => $rule->id, 'name' => $rule->name, 'score' => $contribution];
             }
         }
 
-        return ['ask' => $score >= $threshold, 'score' => $score, 'hits' => $hits, ...array_slice($base, 2)];
+        return ['ask' => $score >= $threshold, 'score' => $score, 'hits' => $hits, 'breakdown' => $breakdown, ...array_slice($base, 2)];
     }
 
     /** Punktebeitrag einer einzelnen Regel (0 = kein Treffer). */

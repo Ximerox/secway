@@ -21,6 +21,8 @@ class SendRules extends Component
 
     public bool $smime_exception = true;
 
+    public bool $debug = false;
+
     // Regel-Editor
     public ?int $editId = null;
 
@@ -41,6 +43,7 @@ class SendRules extends Component
         $this->enabled = Setting::getBool('classify_enabled', false);
         $this->threshold = (int) Setting::get('classify_threshold', 60);
         $this->smime_exception = Setting::getBool('classify_smime_exception', true);
+        $this->debug = Setting::getBool('classify_debug', false);
     }
 
     public function saveSettings(): void
@@ -49,10 +52,22 @@ class SendRules extends Component
         Setting::set('classify_enabled', $this->enabled);
         Setting::set('classify_threshold', $this->threshold);
         Setting::set('classify_smime_exception', $this->smime_exception);
+        Setting::set('classify_debug', $this->debug);
         AuditEvent::log('settings_changed', ip: request()->ip(), details: [
             'classify_enabled' => $this->enabled, 'classify_threshold' => $this->threshold,
+            'classify_debug' => $this->debug,
         ]);
-        session()->flash('ok', 'Einstellungen gespeichert.');
+        session()->flash('ok', 'Einstellungen gespeichert.'.($this->debug ? ' Diagnose-Modus AKTIV — speichert Mailinhalte!' : ''));
+    }
+
+    /** Löscht die im Diagnose-Modus gespeicherten Mailinhalte (Metadaten bleiben). */
+    public function purgeDebug(): void
+    {
+        SendClassifyLog::whereNotNull('debug_body')->update([
+            'debug_subject' => null, 'debug_body' => null,
+            'debug_attachments' => null, 'debug_rules' => null,
+        ]);
+        session()->flash('ok', 'Diagnose-Inhalte gelöscht.');
     }
 
     public function newRule(): void
@@ -148,6 +163,8 @@ class SendRules extends Component
                 'asked' => $logs->where('asked', true)->count(),
                 'smime' => $logs->where('smime_covered', true)->count(),
             ],
+            'debugLogs' => SendClassifyLog::whereNotNull('debug_body')
+                ->orderByDesc('id')->limit(40)->get(),
         ]);
     }
 }

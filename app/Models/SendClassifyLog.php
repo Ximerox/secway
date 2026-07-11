@@ -14,5 +14,7 @@ class SendClassifyLog extends Model
         'asked' => 'boolean',
         'smime_covered' => 'boolean',
         'rule_hits' => 'array',
+        'debug_attachments' => 'array',
+        'debug_rules' => 'array',
     ];
 }

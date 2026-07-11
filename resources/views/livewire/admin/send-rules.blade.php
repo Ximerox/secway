@@ -24,9 +24,62 @@
                     </label>
                 </div>
             </div>
+            <label style="display:flex; gap:8px; align-items:flex-start; margin:14px 0 0;">
+                <input type="checkbox" wire:model="debug" style="width:auto; margin-top:3px;">
+                <span>
+                    <strong>Diagnose-/Lernmodus</strong> — speichert zu jeder geprüften Mail den <strong>kompletten Text</strong>, die Anhang-Namen und die Einzelwertung jeder Regel, um nachzuvollziehen, warum (nicht) gefragt wurde.
+                    <span class="muted" style="display:block;">Achtung: Dabei werden echte Mailinhalte (ggf. mit Sozialdaten) in der Datenbank gespeichert. Nur zur zeitlich begrenzten Analyse aktivieren und danach wieder ausschalten sowie die Inhalte löschen.</span>
+                </span>
+            </label>
             <button type="submit" class="btn">Einstellungen speichern</button>
         </form>
     </div>
+
+    @if ($debug || $debugLogs->isNotEmpty())
+        <div class="card" style="border:1px solid #fde68a;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <h2 style="margin:0;">Diagnose @if($debug)<span class="badge warn">aktiv</span>@endif</h2>
+                @if ($debugLogs->isNotEmpty())
+                    <button class="btn small danger" style="margin-left:auto;" wire:click="purgeDebug" wire:confirm="Alle gespeicherten Mailinhalte der Diagnose löschen? (Kennzahlen bleiben erhalten)">Diagnose-Inhalte löschen ({{ $debugLogs->count() }})</button>
+                @endif
+            </div>
+            <p class="muted" style="margin:6px 0 0;">Die letzten geprüften Mails mit vollständigem Inhalt und Einzelwertung. Schwellwert aktuell: <strong>{{ $threshold }}</strong> — ab diesem Gesamt-Score wird gefragt.</p>
+
+            @forelse ($debugLogs as $d)
+                <details style="margin-top:12px; border:1px solid #e5e7eb; border-radius:8px; padding:0;">
+                    <summary style="cursor:pointer; padding:10px 14px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                        <span class="mono" style="white-space:nowrap;">{{ $d->created_at->format('d.m. H:i') }}</span>
+                        <span>Score <strong>{{ $d->score }}</strong></span>
+                        @if ($d->asked)<span class="badge warn">gefragt</span>@else<span class="badge off">nicht gefragt</span>@endif
+                        <span class="muted">{{ $d->external_count }} externe/{{ $d->recipient_count }} Empf.</span>
+                        <span class="muted" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:340px;">{{ $d->debug_subject ?: '(ohne Betreff)' }}</span>
+                    </summary>
+                    <div style="padding:4px 14px 14px;">
+                        <table class="plain" style="margin-bottom:10px;">
+                            <thead><tr><th>Regel</th><th style="text-align:right;">Beitrag</th></tr></thead>
+                            <tbody>
+                            @foreach ($d->debug_rules ?? [] as $rr)
+                                <tr @if(($rr['contribution'] ?? 0) > 0) style="background:#fffbeb;" @endif>
+                                    <td>{{ $rr['name'] ?? $rr['type'] ?? '?' }} <span class="muted">({{ $rr['type'] ?? '' }})</span></td>
+                                    <td style="text-align:right;">@if(($rr['contribution'] ?? 0) > 0)<strong>+{{ $rr['contribution'] }}</strong>@else<span class="muted">0 / {{ $rr['max'] ?? '?' }}</span>@endif</td>
+                                </tr>
+                            @endforeach
+                            <tr><td style="text-align:right;"><strong>Summe</strong></td><td style="text-align:right;"><strong>{{ $d->score }}</strong> {{ $d->score >= $threshold ? '≥' : '<' }} {{ $threshold }}</td></tr>
+                            </tbody>
+                        </table>
+                        @if (!empty($d->debug_attachments))
+                            <div style="margin-bottom:8px;"><strong>Anhänge:</strong> <span class="mono">{{ implode(', ', $d->debug_attachments) }}</span></div>
+                        @endif
+                        <div><strong>Betreff:</strong> {{ $d->debug_subject ?: '(leer)' }}</div>
+                        <div style="margin-top:6px;"><strong>Text:</strong></div>
+                        <pre style="white-space:pre-wrap; word-break:break-word; background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:10px; font-size:12.5px; max-height:340px; overflow:auto;">{{ $d->debug_body }}</pre>
+                    </div>
+                </details>
+            @empty
+                <p class="muted" style="margin-top:12px;">Noch keine Diagnose-Einträge. Aktivieren Sie den Modus oben und senden Sie eine Testmail über das Add-in.</p>
+            @endforelse
+        </div>
+    @endif
 
     <div class="card">
         <div style="display:flex; align-items:center;">
