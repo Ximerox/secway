@@ -29,6 +29,39 @@ class Certificates extends Component
 
     public string $exportPassword = '';
 
+    public string $tab = 'own';
+
+    public string $ownSort = 'target';
+
+    public string $ownDir = 'asc';
+
+    public string $partnerSort = 'target';
+
+    public string $partnerDir = 'asc';
+
+    /** Erlaubte Sortierspalten je Liste (Whitelist gegen beliebige Spaltennamen). */
+    private const OWN_SORTABLE = ['target', 'subject', 'valid_until', 'active'];
+
+    private const PARTNER_SORTABLE = ['target', 'scope', 'subject', 'valid_until', 'source', 'active'];
+
+    public function sortOwn(string $column): void
+    {
+        if (! in_array($column, self::OWN_SORTABLE, true)) {
+            return;
+        }
+        $this->ownDir = $this->ownSort === $column && $this->ownDir === 'asc' ? 'desc' : 'asc';
+        $this->ownSort = $column;
+    }
+
+    public function sortPartner(string $column): void
+    {
+        if (! in_array($column, self::PARTNER_SORTABLE, true)) {
+            return;
+        }
+        $this->partnerDir = $this->partnerSort === $column && $this->partnerDir === 'asc' ? 'desc' : 'asc';
+        $this->partnerSort = $column;
+    }
+
     /** Detail-Panel für ein Zertifikat auf-/zuklappen. */
     public function showDetails(int $id): void
     {
@@ -155,9 +188,19 @@ class Certificates extends Component
 
     public function render()
     {
+        $ownQuery = SmimeCertificate::where('type', 'own')->orderBy($this->ownSort, $this->ownDir);
+        if ($this->ownSort !== 'valid_until') {
+            $ownQuery->orderByDesc('valid_until');
+        }
+
+        $partnerQuery = SmimeCertificate::where('type', 'partner')->orderBy($this->partnerSort, $this->partnerDir);
+        if ($this->partnerSort !== 'valid_until') {
+            $partnerQuery->orderByDesc('valid_until');
+        }
+
         return view('livewire.admin.certificates', [
-            'own' => SmimeCertificate::where('type', 'own')->orderBy('target')->orderByDesc('valid_until')->get(),
-            'partners' => SmimeCertificate::where('type', 'partner')->orderBy('target')->orderByDesc('valid_until')->get(),
+            'own' => $ownQuery->get(),
+            'partners' => $partnerQuery->get(),
         ]);
     }
 }

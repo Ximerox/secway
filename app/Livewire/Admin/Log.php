@@ -40,14 +40,30 @@ class Log extends Component
                 ->orWhere('ip', 'like', $like));
         }
 
-        $events = $query->paginate(60);
-
-        // Nachträglich nach Richtung filtern (abgeleitet, keine DB-Spalte)
+        // Richtung ist eine reine Funktion des Ereignisnamens — deshalb als
+        // SQL-Filter VOR der Pagination (sonst stimmen Seitenzahl und Inhalt
+        // nicht: leere Seiten trotz Treffern, Paginator zählt Ungefiltertes).
         if ($this->direction !== '') {
-            $events->setCollection(
-                $events->getCollection()->filter(fn ($e) => $e->direction() === $this->direction)->values()
-            );
+            $explicit = AuditEvent::eventsForDirection($this->direction);
+            $query->where(function ($w) use ($explicit) {
+                $w->whereIn('event', $explicit);
+                if ($this->direction === 'System') {
+                    // Präfix-Regel aus AuditEvent::direction(): admin_*/cert_*/
+                    // settings_* gelten als System, sofern nicht explizit anders
+                    // zugeordnet (z.B. cert_harvested => eingehend).
+                    $w->orWhere(function ($p) {
+                        $p->whereNotIn('event', AuditEvent::mappedEvents())
+                            ->where(function ($x) {
+                                $x->where('event', 'like', 'admin\_%')
+                                    ->orWhere('event', 'like', 'cert\_%')
+                                    ->orWhere('event', 'like', 'settings\_%');
+                            });
+                    });
+                }
+            });
         }
+
+        $events = $query->paginate(60);
 
         return view('livewire.admin.log', ['events' => $events]);
     }

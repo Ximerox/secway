@@ -71,10 +71,16 @@
     <style>
         .badge.dir-out { background:#eff6ff; color:#1d4e89; }
         .badge.crypt { background:#f5f3ff; color:#6d28d9; }
-        table.log { width:100%; border-collapse:collapse; font-size:13.5px; }
+        table.log { width:100%; border-collapse:collapse; font-size:13.5px; table-layout:fixed; }
         table.log th { text-align:left; color:#6b7280; font-size:12px; text-transform:uppercase; letter-spacing:.03em; padding:10px 14px; border-bottom:2px solid #e5e7eb; }
-        table.log td { padding:9px 14px; vertical-align:top; border-bottom:1px solid #f0f1f3; }
+        table.log td { padding:9px 14px; vertical-align:top; border-bottom:1px solid #f0f1f3; overflow-wrap:anywhere; }
         table.log tr.b0 td { background:#ffffff; }
         table.log tr.b1 td { background:#f6f8fb; }
+        @media (max-width: 820px) {
+            table.log { display:table; } /* bricht um statt zu scrollen */
+            table.log th:nth-child(1) { width:92px; }
+            table.log th:nth-child(2) { width:96px; }
+            table.log th, table.log td { padding:8px 8px; }
+        }
     </style>
 </div>

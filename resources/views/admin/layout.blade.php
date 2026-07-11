@@ -22,7 +22,7 @@
     nav .grp:hover > .trigger, nav .grp:focus-within > .trigger,
     nav .grp > .trigger.active { color: #fff; background: #163d6d; }
     nav .grp .menu {
-        display: none; position: absolute; top: 54px; left: 0; z-index: 50;
+        display: none; position: absolute; top: 100%; left: 0; z-index: 50;
         background: #163d6d; min-width: 210px; padding: 6px 0;
         border-radius: 0 0 10px 10px; box-shadow: 0 10px 24px rgba(16,24,40,.25);
     }
@@ -69,6 +69,30 @@
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
     .error { color: #b91c1c; font-size: 13px; margin-top: 4px; }
     .mono { font-family: Consolas, Menlo, monospace; font-size: 12.5px; }
+    label.opt { display:flex; align-items:flex-start; gap:10px; font-weight:400; cursor:pointer; margin:0; }
+    label.opt input[type=checkbox] { margin-top:3px; width:auto; }
+    .tabbar { display:flex; gap:4px; flex-wrap:wrap; border-bottom:1px solid #e5e7eb; margin-bottom:16px; }
+    .tabbar .tab { background:none; border:none; padding:9px 14px; font-size:14.5px; color:#6b7280; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+    .tabbar .tab:hover { color:#1d4e89; }
+    .tabbar .tab.is-active { color:#1d4e89; font-weight:600; border-bottom-color:#1d4e89; }
+    .tabpane { display:none; }
+    .tabpane.is-active { display:block; }
+    th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
+    th.sortable:hover { color:#1d4e89; }
+    th.sortable .arrow { display:inline-block; margin-left:3px; font-size:10px; }
+    /* Mobile: Nav umbrechen lassen, einspaltige Formulare, breite Tabellen scrollen in der Karte */
+    @media (max-width: 820px) {
+        nav { flex-wrap: wrap; height: auto; padding: 4px 10px; }
+        nav .brand { margin-right: 14px; }
+        nav a, nav .grp > .trigger { padding: 10px 9px; font-size: 13.5px; }
+        nav .grp { height: auto; }
+        nav form { margin-left: auto; }
+        main { padding: 18px 10px 50px; }
+        h1 { font-size: 19px; }
+        .card { padding: 14px; }
+        .grid2 { grid-template-columns: 1fr; }
+        table:not(.plain) { display: block; overflow-x: auto; }
+    }
 </style>
 </head>
 <body>
