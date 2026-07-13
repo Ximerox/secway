@@ -61,12 +61,14 @@
     <div class="card">
         <input type="text" wire:model.live.debounce.400ms="q" placeholder="Suche: Name, E-Mail, Abteilung, Position …" style="max-width:420px;">
         <table style="margin-top:12px;">
-            <thead><tr><th>Name</th><th>E-Mail</th><th>Position</th><th>Abteilung</th><th>Telefon</th><th>Mobil</th><th>Status</th></tr></thead>
+            <thead><tr><th>Name / E-Mail</th><th>Position</th><th>Abteilung</th><th>Telefon</th><th>Mobil</th><th>Status</th><th title="„Sicher versenden?"-Rückfrage des Outlook-Add-ins für diesen Benutzer">Rückfrage</th><th title="Signaturblock im Add-in beim Schreiben (Client) oder erst beim Versand im Gateway (Server)">Signatur</th></tr></thead>
             <tbody>
             @forelse ($users as $u)
                 <tr>
-                    <td><strong>{{ $u->display_name }}</strong></td>
-                    <td>{{ $u->mail }}</td>
+                    <td>
+                        <strong>{{ $u->display_name }}</strong><br>
+                        <span class="muted" style="font-size:12.5px;word-break:break-all;">{{ $u->mail }}</span>
+                    </td>
                     <td>{{ $u->job_title ?: '—' }}</td>
                     <td>{{ $u->department ?: '—' }}</td>
                     <td>{{ $u->business_phone ?: '—' }}</td>
@@ -76,9 +78,19 @@
                         @else <span class="badge off">deaktiviert</span>
                         @endif
                     </td>
+                    <td style="white-space:nowrap;">
+                        <button class="btn small {{ $u->classify_enabled ? 'ghost' : 'danger' }}" style="padding:1px 8px;font-size:12px;"
+                            title="{{ $u->classify_enabled ? 'Sende-Rückfrage aktiv — klicken zum Deaktivieren' : 'Sende-Rückfrage AUS — klicken zum Aktivieren' }}"
+                            wire:click="toggleClassify({{ $u->id }})">{{ $u->classify_enabled ? 'an' : 'aus' }}</button>
+                    </td>
+                    <td style="white-space:nowrap;">
+                        <button class="btn small ghost" style="padding:1px 8px;font-size:12px;"
+                            title="{{ $u->signature_client_enabled ? 'Signatur wird im Add-in eingefügt (beim Schreiben sichtbar) — klicken für Gateway' : 'Signatur wird erst im Gateway angefügt (Server) — klicken für Client' }}"
+                            wire:click="toggleSignatureClient({{ $u->id }})">{{ $u->signature_client_enabled ? 'Client' : 'Gateway' }}</button>
+                    </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="muted">Noch keine Benutzer im Cache — „Jetzt synchronisieren" klicken.</td></tr>
+                <tr><td colspan="8" class="muted">Noch keine Benutzer im Cache — „Jetzt synchronisieren" klicken.</td></tr>
             @endforelse
             </tbody>
         </table>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EntraUser;
 use App\Models\SendClassifyLog;
 use App\Models\Setting;
 use App\Services\SendClassifier;
@@ -25,6 +26,7 @@ class ClassifyController extends Controller
         }
 
         $data = $request->validate([
+            'sender' => 'nullable|string|max:320',
             'subject' => 'nullable|string|max:2000',
             'body' => 'nullable|string|max:200000',
             'attachments' => 'nullable|array',
@@ -32,6 +34,16 @@ class ClassifyController extends Controller
             'recipients' => 'nullable|array',
             'recipients.*' => 'string|max:320',
         ]);
+
+        // Pro-Benutzer-Schalter (Admin → Benutzer): Rückfrage für diesen
+        // Absender deaktiviert → sofort freigeben. Die Absenderangabe kommt
+        // vom Add-in (clientseitig behauptet) — für die Frage „Rückfrage
+        // ja/nein" unkritisch. Unbekannte Absender/ältere Add-in-Versionen
+        // ohne sender-Feld werden normal geprüft.
+        $sender = strtolower(trim((string) ($data['sender'] ?? '')));
+        if ($sender !== '' && ($user = EntraUser::forSender($sender)) !== null && ! $user->classify_enabled) {
+            return response()->json(['ask' => false, 'reason' => 'user_disabled']);
+        }
 
         $tag = (string) Setting::get('subject_tag', config('mailgateway.subject_tag'));
 

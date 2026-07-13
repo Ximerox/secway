@@ -13,6 +13,8 @@ class EntraUser extends Model
         'group_ids' => 'array',
         'raw' => 'array',
         'account_enabled' => 'boolean',
+        'classify_enabled' => 'boolean',
+        'signature_client_enabled' => 'boolean',
         'synced_at' => 'datetime',
     ];
 

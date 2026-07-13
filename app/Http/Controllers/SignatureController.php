@@ -37,6 +37,14 @@ class SignatureController extends Controller
             return response()->json(['none' => true, 'html' => null, 'reason' => 'unknown_sender']);
         }
 
+        // Pro-Benutzer-Schalter (Admin → Benutzer): aus = das Add-in fügt
+        // NICHTS ein (setzt Signatur leer, entfernt X-MGW-Signed) — dadurch
+        // greift automatisch das serverseitige Anfügen im Gateway. Steuert
+        // also nur, WO der Block entsteht, nicht OB.
+        if (! $user->signature_client_enabled) {
+            return response()->json(['none' => true, 'html' => null, 'reason' => 'user_disabled']);
+        }
+
         $templates = SignatureTemplate::applicable($user, array_values($data['recipients'] ?? []));
         if ($templates->isEmpty()) {
             return response()->json(['none' => true, 'html' => null]);

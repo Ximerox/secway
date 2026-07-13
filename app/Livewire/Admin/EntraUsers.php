@@ -76,6 +76,35 @@ class EntraUsers extends Component
         }
     }
 
+    /** Pro-Benutzer-Schalter für die „Sicher versenden?"-Rückfrage des Add-ins. */
+    public function toggleClassify(int $id): void
+    {
+        $u = EntraUser::findOrFail($id);
+        $u->classify_enabled = ! $u->classify_enabled;
+        $u->save();
+
+        AuditEvent::log('settings_changed', ip: request()->ip(), details: [
+            'user_classify_enabled' => $u->classify_enabled,
+            'user' => $u->mail ?: $u->upn,
+        ]);
+        session()->flash('ok', 'Sende-Rückfrage für '.($u->display_name ?: $u->mail).' '.($u->classify_enabled ? 'aktiviert' : 'deaktiviert').'.');
+    }
+
+    /** Pro-Benutzer-Schalter: Signaturblock im Add-in (an) oder erst im Gateway (aus). */
+    public function toggleSignatureClient(int $id): void
+    {
+        $u = EntraUser::findOrFail($id);
+        $u->signature_client_enabled = ! $u->signature_client_enabled;
+        $u->save();
+
+        AuditEvent::log('settings_changed', ip: request()->ip(), details: [
+            'user_signature_client_enabled' => $u->signature_client_enabled,
+            'user' => $u->mail ?: $u->upn,
+        ]);
+        session()->flash('ok', 'Signatur für '.($u->display_name ?: $u->mail).': '
+            .($u->signature_client_enabled ? 'im Client (Add-in, beim Schreiben sichtbar)' : 'erst im Gateway (Server)').'.');
+    }
+
     public function render()
     {
         $query = EntraUser::orderBy('display_name');

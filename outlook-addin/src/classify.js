@@ -43,26 +43,42 @@ function onMessageSendHandler(event) {
     try {
         collect(item, function (payload) {
             classify(payload, function (verdict) {
-                disarm();
-                if (!verdict || !verdict.ask) {
-                    finish({ allowEvent: true });
-                    return;
-                }
-                // Möglicherweise vertraulich: Versand mit Hinweis anhalten.
-                // sendModeOverride "promptUser" macht aus dem Manifest-SoftBlock
-                // zur Laufzeit eine Rückfrage MIT „Trotzdem senden" (ab Mailbox
-                // 1.14; ältere Clients bleiben beim SoftBlock = nur „Nicht senden").
-                // „Trotzdem senden" = ungeschützt raus; „Nicht senden" = zurück
-                // zum Entwurf, dann Betreff-Tag setzen und erneut senden.
-                const tag = verdict.tag || "####";
-                finish({
-                    allowEvent: false,
-                    sendModeOverride: "promptUser",
-                    errorMessage:
-                        "Diese E-Mail könnte vertrauliche Daten enthalten. " +
-                        "Für einen gesicherten, verschlüsselten Versand wählen Sie „Nicht senden“, " +
-                        "fügen dem Betreff „" + tag + "“ hinzu und senden die E-Mail erneut. " +
-                        "Sollten Sie die E-Mail trotzdem ungesichert senden wollen, klicken Sie auf „Trotzdem senden“."
+                const ask = !!(verdict && verdict.ask);
+                // Log-ID der Klassifizierung mitgeben, damit das Gateway den
+                // „Trotz Warnung gesendet"-Protokolleintrag mit Score/Regeln
+                // anreichern und die Nutzerwahl nachtragen kann.
+                const logId = (ask && verdict && verdict.logId) ? String(verdict.logId) : null;
+                // Marker „bewusst entschieden" (X-MGW-Send-Override) an der Mail
+                // spiegeln: bei Warnung SETZEN — klickt der Nutzer dann „Trotzdem
+                // senden", trägt die Mail den Marker und das Gateway überspringt
+                // die nachgelagerte KI-Prüfung (der Mensch hat entschieden). Ohne
+                // Warnung ENTFERNEN — u. a. wenn der Nutzer nach der Rückfrage den
+                // Betreff-Tag gesetzt hat (dann ask=false → sauber ohne Marker,
+                // die Mail geht ohnehin über den Tag ins Portal). Wächter bleibt
+                // während des Header-Schritts scharf: hängt er, wird fail-open
+                // gesendet (dann greift ggf. die nachgelagerte Prüfung).
+                setOverrideHeader(item, ask, logId, function () {
+                    disarm();
+                    if (!ask) {
+                        finish({ allowEvent: true });
+                        return;
+                    }
+                    // Möglicherweise vertraulich: Versand mit Hinweis anhalten.
+                    // sendModeOverride "promptUser" macht aus dem Manifest-SoftBlock
+                    // zur Laufzeit eine Rückfrage MIT „Trotzdem senden" (ab Mailbox
+                    // 1.14; ältere Clients bleiben beim SoftBlock = nur „Nicht senden").
+                    // „Trotzdem senden" = ungeschützt raus; „Nicht senden" = zurück
+                    // zum Entwurf, dann Betreff-Tag setzen und erneut senden.
+                    const tag = verdict.tag || "####";
+                    finish({
+                        allowEvent: false,
+                        sendModeOverride: "promptUser",
+                        errorMessage:
+                            "Diese E-Mail könnte vertrauliche Daten enthalten. " +
+                            "Für einen gesicherten, verschlüsselten Versand wählen Sie „Nicht senden“, " +
+                            "fügen dem Betreff „" + tag + "“ hinzu und senden die E-Mail erneut. " +
+                            "Sollten Sie die E-Mail trotzdem ungesichert senden wollen, klicken Sie auf „Trotzdem senden“."
+                    });
                 });
             });
         });
@@ -71,9 +87,41 @@ function onMessageSendHandler(event) {
     }
 }
 
+/*
+ * Setzt (on=true) oder entfernt (on=false) den internen Marker
+ * X-MGW-Send-Override auf der ausgehenden Mail. Best effort: fehlt die
+ * internetHeaders-API (Mailbox < 1.8) oder schlägt sie fehl, wird einfach
+ * fortgefahren — ein fehlender Marker ist unkritisch (das Gateway lässt dann
+ * ggf. die nachgelagerte Prüfung laufen, fail-safe). done() wird IMMER
+ * genau einmal aufgerufen, auch im Fehlerfall.
+ */
+function setOverrideHeader(item, on, logId, done) {
+    let called = false;
+    function once() { if (!called) { called = true; done(); } }
+    try {
+        const ih = item.internetHeaders;
+        if (!ih) { once(); return; }
+        if (on) {
+            const headers = { "X-MGW-Send-Override": "yes" };
+            if (logId) headers["X-MGW-Classify-Log"] = logId;
+            ih.setAsync(headers, function () { once(); });
+        } else {
+            ih.removeAsync(["X-MGW-Send-Override", "X-MGW-Classify-Log"], function () { once(); });
+        }
+    } catch (e) {
+        once();
+    }
+}
+
 /* Betreff + Body (Text) + Anhang-Namen + Empfänger einsammeln */
 function collect(item, done) {
-    const payload = { subject: "", body: "", attachments: [], recipients: [] };
+    const payload = { sender: "", subject: "", body: "", attachments: [], recipients: [] };
+    // Absender mitgeben: erlaubt SecWay, die Rückfrage pro Benutzer zu
+    // (de)aktivieren (Admin → Benutzer). Fehlt der Wert, wird normal geprüft.
+    try {
+        const p = Office.context.mailbox.userProfile;
+        payload.sender = (p && p.emailAddress) ? p.emailAddress : "";
+    } catch (e) { /* ohne Absender fortfahren */ }
     item.subject.getAsync(function (s) {
         payload.subject = (s.status === "succeeded" && s.value) ? s.value : "";
         item.body.getAsync(Office.CoercionType.Text, function (b) {

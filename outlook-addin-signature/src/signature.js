@@ -31,33 +31,63 @@ function onComposeHandler(event) {
 
     try {
         var item = Office.context.mailbox.item;
-        var profile = Office.context.mailbox.userProfile;
-        var sender = (profile && profile.emailAddress) ? profile.emailAddress : "";
-        if (!sender || !item || !item.body) { end(); return; }
+        if (!item || !item.body) { end(); return; }
 
-        gatherRecipients(item, function (recipients) {
-            fetchSignature(sender, recipients, function (res) {
-                if (!res) { end(); return; } // Fehler/Timeout: nichts tun, Gateway übernimmt
+        resolveSender(item, function (sender) {
+            if (!sender) { end(); return; }
+            gatherRecipients(item, function (recipients) {
+                fetchSignature(sender, recipients, function (res) {
+                    if (!res) { end(); return; } // Fehler/Timeout: nichts tun, Gateway übernimmt
 
-                if (res.none || !res.html) {
-                    // Keine Regel passt: vorhandenen Block entfernen, Marker-Header weg
-                    item.body.setSignatureAsync("", { coercionType: Office.CoercionType.Html }, function () {
-                        removeHeader(item, end);
-                    });
-                    return;
-                }
-
-                item.body.setSignatureAsync(res.html, { coercionType: Office.CoercionType.Html }, function (r) {
-                    if (r && r.status === "succeeded") {
-                        setHeader(item, end); // Header NUR nach erfolgreichem Einfügen
-                    } else {
-                        end();
+                    if (res.none || !res.html) {
+                        // Keine Regel passt: vorhandenen Block entfernen, Marker-Header weg
+                        item.body.setSignatureAsync("", { coercionType: Office.CoercionType.Html }, function () {
+                            removeHeader(item, end);
+                        });
+                        return;
                     }
+
+                    item.body.setSignatureAsync(res.html, { coercionType: Office.CoercionType.Html }, function (r) {
+                        if (r && r.status === "succeeded") {
+                            setHeader(item, end); // Header NUR nach erfolgreichem Einfügen
+                        } else {
+                            end();
+                        }
+                    });
                 });
             });
         });
     } catch (e) {
         end();
+    }
+}
+
+/*
+ * Tatsächlichen Absender bestimmen: das „Von"-Feld der Mail (item.from) —
+ * entscheidend bei freigegebenen Postfächern/„Senden als", wo der angemeldete
+ * Benutzer NICHT der Absender ist. Fällt auf das Benutzerprofil zurück, wenn
+ * from nicht verfügbar ist (ältere Clients). Zusammen mit dem Manifest-Event
+ * OnMessageFromChanged wird die Signatur beim Wechsel des Von-Felds getauscht.
+ */
+function resolveSender(item, done) {
+    function fallback() {
+        var profile = Office.context.mailbox.userProfile;
+        done((profile && profile.emailAddress) ? profile.emailAddress : "");
+    }
+    try {
+        if (item.from && item.from.getAsync) {
+            item.from.getAsync(function (res) {
+                if (res && res.status === "succeeded" && res.value && res.value.emailAddress) {
+                    done(res.value.emailAddress);
+                } else {
+                    fallback();
+                }
+            });
+        } else {
+            fallback();
+        }
+    } catch (e) {
+        fallback();
     }
 }
 
