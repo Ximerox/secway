@@ -283,17 +283,26 @@ class MailIngest extends Command
         // Override hat Vorrang (überstimmt den Menschen nicht). Fail-safe:
         // Dienst weg / unter Schwelle → alles bleibt beim normalen Durchleiten.
         $llmMode = Setting::llmReviewMode();
+        $reviewScore = null; // fürs Protokoll: Score der Nachprüfung, auch unter der Schwelle
         if ($externalPlain !== [] && $llmMode !== 'off') {
-            $verdict = $override ? null : $this->reviewOutbound($parsed);
-            $threshold = (int) Setting::get('llm_review_score', 70);
-            if ($verdict !== null && $verdict['score'] >= $threshold) {
+            // Volle classify()-Engine wie das Plugin (Anhang-Namen, Stichworte,
+            // Geburtsdatum, KI) — aber im Review-Modus: je Regel zählt der
+            // review_score, die KI-Regel nutzt das große Modell, Schwelle ist
+            // classify_review_threshold. So ist das Netz mindestens so gründlich
+            // wie das Plugin und fängt auch Anhang-/Stichwort-Fälle.
+            $verdict = $override ? null : $this->reviewOutbound($parsed, array_keys($externalPlain));
+            $reviewScore = $verdict['score'] ?? null;
+            $threshold = (int) Setting::get('classify_review_threshold', 60);
+            if ($verdict !== null && ($verdict['ask'] ?? false)) {
+                $firedRules = array_map(fn ($h) => $h['name'] ?? '?', $verdict['hits'] ?? []);
                 if ($llmMode === 'log') {
                     AuditEvent::log('llm_flagged', details: [
                         'queue_id' => $queueId,
                         'sender' => $sender,
                         'recipients' => array_keys($externalPlain),
-                        'llm_score' => $verdict['score'],
+                        'score' => $verdict['score'],
                         'threshold' => $threshold,
+                        'rules' => $firedRules,
                         'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
                         'note' => 'Nur-Log-Modus — Mail wurde NICHT umgeleitet',
                     ]);
@@ -315,8 +324,9 @@ class MailIngest extends Command
                         'queue_id' => $queueId,
                         'sender' => $sender,
                         'recipients' => $secured,
-                        'llm_score' => $verdict['score'],
+                        'score' => $verdict['score'],
                         'threshold' => $threshold,
+                        'rules' => $firedRules,
                         'method' => $securedPortal !== [] ? 'portal' : 'smime',
                         'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
                     ]);
@@ -352,10 +362,10 @@ class MailIngest extends Command
 
         if ($passRcpts !== []) {
             app(SmimeMailService::class)->passThrough($raw, $sender, $passRcpts);
-            AuditEvent::log('passed_through', details: [
+            AuditEvent::log('passed_through', details: array_merge([
                 'queue_id' => $queueId, 'sender' => $sender, 'recipients' => $passRcpts,
                 'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
-            ]);
+            ], $reviewScore !== null ? ['ki_score' => $reviewScore] : []));
         }
 
         if ($smime !== []) {
@@ -391,12 +401,15 @@ class MailIngest extends Command
     }
 
     /**
-     * Legt Betreff + Text der ausgehenden Mail dem nachgelagerten Modell vor.
-     * Text bevorzugt, sonst aus HTML gestrippt. null = Dienst nicht verfügbar.
+     * Legt Betreff + Text + Anhang-Dateinamen + Empfänger der vollen classify()-
+     * Engine im Review-Modus vor (dieselben Regeln wie das Plugin, aber mit
+     * review_score-Gewichtung und dem großen KI-Modell). Text bevorzugt, sonst
+     * aus HTML gestrippt. Anhangs-INHALTE werden nicht gelesen, nur Namen.
      *
-     * @return array{sensibel: bool, score: int}|null
+     * @param  array<int,string>  $recipients  externe Plain-Empfänger dieser Mail
+     * @return array{ask: bool, score: int, hits: array<int,array{id:int,name:string,score:int}>}
      */
-    private function reviewOutbound(Message $parsed): ?array
+    private function reviewOutbound(Message $parsed, array $recipients): array
     {
         $body = $parsed->getTextContent();
         if ($body === null || trim($body) === '') {
@@ -404,7 +417,54 @@ class MailIngest extends Command
             $body = $html !== '' ? trim(html_entity_decode(strip_tags($html))) : '';
         }
 
-        return app(SendClassifier::class)->reviewSensitive((string) $parsed->getSubject(), (string) $body);
+        // Nicht-inline Anhang-Dateinamen (wie das Add-in: Inline-Bilder raus).
+        $attachments = [];
+        foreach ($parsed->getAllAttachmentParts() as $part) {
+            $fn = trim((string) $part->getFilename());
+            if ($fn !== '' && strtolower((string) $part->getContentDisposition()) !== 'inline') {
+                $attachments[] = $fn;
+            }
+        }
+
+        $input = [
+            'subject' => (string) $parsed->getSubject(),
+            'body' => (string) $body,
+            'attachments' => $attachments,
+            'recipients' => $recipients,
+        ];
+        $threshold = (int) Setting::get('classify_review_threshold', 60);
+
+        // review = true → review_score-Gewichtung + großes KI-Modell;
+        // smimeException = false, weil wir hier gerade die Mails prüfen, die
+        // sonst UNVERSCHLÜSSELT rausgingen (Positiv-Ausnahme wäre sinnwidrig).
+        $verdict = app(SendClassifier::class)->classify($input, $threshold, false, true);
+
+        // JEDE nachgelagerte Prüfung protokollieren (auch unter der Schwelle) —
+        // mit Inhalt und Einzelwertung zur Kalibrierung im Admin. Die Inhalte
+        // werden nach 7 Tagen automatisch entfernt (Sozialdaten!), die Kenn-
+        // zahlen bleiben. Logging darf die Zustellung nie gefährden.
+        try {
+            SendClassifyLog::create([
+                'source' => 'review',
+                'score' => $verdict['score'],
+                'asked' => $verdict['ask'],
+                'rule_hits' => $verdict['hits'],
+                'recipient_count' => count($recipients),
+                'external_count' => count($recipients),
+                'debug_subject' => mb_substr($input['subject'], 0, 2000) ?: null,
+                'debug_body' => mb_substr($input['body'], 0, 20000) ?: null,
+                'debug_attachments' => $attachments,
+                'debug_rules' => $verdict['breakdown'] ?? [],
+            ]);
+            SendClassifyLog::where('source', 'review')
+                ->where('created_at', '<', now()->subDays(7))
+                ->whereNotNull('debug_body')
+                ->update(['debug_subject' => null, 'debug_body' => null, 'debug_attachments' => null, 'debug_rules' => null]);
+        } catch (Throwable $e) {
+            Log::warning('Review-Log fehlgeschlagen: '.$e->getMessage());
+        }
+
+        return $verdict;
     }
 
     private function findOrStoreMessage(string $queueId, string $sender, string $raw, Message $parsed): SecureMessage

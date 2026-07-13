@@ -19,12 +19,23 @@ use Illuminate\Support\Facades\Log;
  */
 class SendClassifier
 {
-    /** Knappe, deutschsprachige System-Anweisung für den lokalen LLM. */
+    /**
+     * Knappe, deutschsprachige System-Anweisung für den lokalen LLM.
+     * Zweck ist KLIENTENSCHUTZ: rein private Mails der Mitarbeiter (eigene
+     * Gesundheit/Familie/Termine in Ich-Form) sollen NIEDRIG bewertet werden,
+     * damit sie nicht fälschlich abgesichert/markiert werden — Fallmails auch
+     * in Ich-Form („Ich habe heute mit Lena gesprochen …") bleiben sensibel.
+     * Gemessen 13.07.2026 (eval_prompt.py, 12 Fälle inkl. privat/Ich-Form):
+     * 7B 12/12 (privat 20–25, Fall 75–95), 3B 10/12. Text EXAKT wie getestet
+     * lassen (bewusst ohne Umlaute); Änderungen erst nach neuer Messung.
+     */
     private const LLM_SYSTEM =
-        'Datenschutz-Filter Kinder-/Jugendhilfe. Enthält die Mail schutzbedürftige '
-        .'personenbezogene Daten konkreter Betroffener (Gesundheit, Soziales, Familie, '
-        .'Name+Geburtsdatum/Adresse, Diagnose, Hilfe-/Sorgerecht/Kindeswohl)? '
-        .'Organisatorisch/technisch/allgemein = nein. Antworte NUR JSON: '
+        'Datenschutz-Filter einer Kinder-/Jugendhilfe-Einrichtung. Zweck: NUR Klientendaten schuetzen. '
+        .'sensibel=true nur, wenn die Mail schutzbeduerftige Daten von KLIENTEN/betreuten Personen '
+        .'im Fall-/Fachkontext enthaelt (Gesundheit, Diagnose, Familie, Sorgerecht, Kindeswohl, '
+        .'Hilfeplan, Name+Geburtsdatum). Private Angelegenheiten des Absenders und seiner EIGENEN '
+        .'Familie (eigene Termine, eigene Gesundheit, eigene Kinder, eigene Rechnungen) sowie '
+        .'Organisatorisches/Technisches = nein, score niedrig. Antworte NUR JSON: '
         .'{"sensibel":true|false,"score":0-100}';
 
 
@@ -32,7 +43,7 @@ class SendClassifier
      * @param  array{subject?:string, body?:string, attachments?:array<int,string>, recipients?:array<int,string>}  $input
      * @return array{ask:bool, score:int, hits:array<int,array{id:int,name:string,score:int}>, smimeCovered:bool, recipientCount:int, externalCount:int}
      */
-    public function classify(array $input, int $threshold, bool $smimeException): array
+    public function classify(array $input, int $threshold, bool $smimeException, bool $review = false): array
     {
         $subject = (string) ($input['subject'] ?? '');
         $body = (string) ($input['body'] ?? '');
@@ -66,17 +77,24 @@ class SendClassifier
         $hits = [];
         $breakdown = [];
         foreach (SendRule::where('active', true)->get() as $rule) {
+            // Zwei Score-Werte je Regel: im Plugin-Modus zählt `score`, in der
+            // nachgelagerten Prüfung `review_score`. So lässt sich das Netz
+            // strenger/lockerer gewichten als die Live-Rückfrage.
+            $ruleScore = $review ? (int) $rule->review_score : (int) $rule->score;
             $extra = [];
             if ($rule->type === 'llm') {
-                // Beitrag = feste Punkte bei „sensibel = ja" PLUS Faktor (% aus
-                // dem threshold-Feld) auf den eigenen 0–100-Score des Modells.
-                // Beides 0 → die KI zählt nicht mit.
-                $verdict = $this->evaluateLlm($subject, $body);
-                $factor = max(0, (int) $rule->threshold);
+                // Beitrag = feste Punkte bei „sensibel = ja" PLUS Faktor (%) auf
+                // den eigenen 0–100-Score des Modells. Beides 0 → die KI zählt
+                // nicht mit. Nachgelagert nutzt das „gute" (größere) Modell
+                // (reviewSensitive) und den eigenen Faktor review_threshold —
+                // das kleine Plugin-Modell und das große lassen sich so
+                // unterschiedlich gewichten.
+                $verdict = $review ? $this->reviewSensitive($subject, $body) : $this->evaluateLlm($subject, $body);
+                $factor = max(0, (int) ($review ? $rule->review_threshold : $rule->threshold));
                 $contribution = 0;
                 if ($verdict !== null) {
                     if ($verdict['sensibel']) {
-                        $contribution += (int) $rule->score;
+                        $contribution += $ruleScore;
                     }
                     $contribution += (int) round($factor / 100 * $verdict['score']);
                 }
@@ -87,13 +105,13 @@ class SendClassifier
                     'llm_factor' => $factor,
                 ];
             } else {
-                $contribution = $this->evaluate($rule, $haystack, $names, $subject, $body);
+                $contribution = $this->evaluate($rule, $haystack, $names, $subject, $body, $ruleScore);
             }
 
             // Vollständige Einzelwertung (auch 0) — für den Diagnose-Modus.
             $breakdown[] = array_merge([
                 'id' => $rule->id, 'name' => $rule->name, 'type' => $rule->type,
-                'max' => $rule->score, 'contribution' => $contribution,
+                'max' => $ruleScore, 'contribution' => $contribution,
             ], $extra);
 
             if ($contribution > 0) {
@@ -106,16 +124,16 @@ class SendClassifier
     }
 
     /** Punktebeitrag einer einzelnen Regel (0 = kein Treffer). */
-    private function evaluate(SendRule $rule, string $haystack, array $attachmentNames, string $subject, string $body): int
+    private function evaluate(SendRule $rule, string $haystack, array $attachmentNames, string $subject, string $body, int $ruleScore): int
     {
         return match ($rule->type) {
-            'attachment_name' => $this->matchAny($rule->termList(), $attachmentNames) ? $rule->score : 0,
+            'attachment_name' => $this->matchAny($rule->termList(), $attachmentNames) ? $ruleScore : 0,
             // Reagiert allein auf die Existenz eines echten Anhangs. Inline-Bilder
             // (z. B. Signatur-Logos) sendet das Add-in gar nicht erst mit — die
             // Liste enthält also nur nicht-inline Dateianhänge.
-            'attachment_any' => $attachmentNames !== [] ? $rule->score : 0,
-            'keyword' => $this->countTerms($rule->termList(), $haystack) >= max(1, $rule->threshold) ? $rule->score : 0,
-            'birthdate' => $this->hasPastDate($haystack, max(0, $rule->threshold)) ? $rule->score : 0,
+            'attachment_any' => $attachmentNames !== [] ? $ruleScore : 0,
+            'keyword' => $this->countTerms($rule->termList(), $haystack) >= max(1, $rule->threshold) ? $ruleScore : 0,
+            'birthdate' => $this->hasPastDate($haystack, max(0, $rule->threshold)) ? $ruleScore : 0,
             default => 0, // 'llm' wird in classify() gesondert behandelt
         };
     }

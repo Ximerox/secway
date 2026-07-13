@@ -12,6 +12,8 @@ class SendRule extends Model
         'active' => 'boolean',
         'threshold' => 'integer',
         'score' => 'integer',
+        'review_score' => 'integer',
+        'review_threshold' => 'integer',
     ];
 
     /** @return array<int, string> Begriffe der Regel (klein, getrimmt). */

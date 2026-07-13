@@ -5,6 +5,12 @@
     @if (session('ok'))<div class="alert ok">{{ session('ok') }}</div>@endif
     @if (session('err'))<div class="alert err">{{ session('err') }}</div>@endif
 
+    <div class="tabbar" style="margin-bottom:14px;">
+        <button type="button" @class(['tab', 'is-active' => $tab === 'regeln']) wire:click="$set('tab', 'regeln')">Regeln &amp; Einstellungen</button>
+        <button type="button" @class(['tab', 'is-active' => $tab === 'diagnose']) wire:click="$set('tab', 'diagnose')">Diagnose-Logs @if($debug)<span class="badge warn" style="margin-left:4px;">aktiv</span>@endif</button>
+    </div>
+
+    <div @class(['tabpane', 'is-active' => $tab === 'regeln'])>
     <form wire:submit="saveSettings">
         <div class="card">
             <h2 style="margin-top:0;">Sende-Rückfrage im Outlook-Add-in</h2>
@@ -35,18 +41,11 @@
                 </div>
             </div>
 
-            <label class="opt" style="margin-top:14px;">
-                <input type="checkbox" wire:model="debug">
-                <span>
-                    <strong>Diagnose-/Lernmodus</strong><br>
-                    <span class="muted">Speichert zu jeder geprüften Mail den <strong>kompletten Text</strong>, die Anhang-Namen und die Einzelwertung jeder Regel, um nachzuvollziehen, warum (nicht) gefragt wurde. Achtung: echte Mailinhalte (ggf. mit Sozialdaten) landen in der Datenbank — nur zur zeitlich begrenzten Analyse aktivieren, danach ausschalten und Inhalte löschen.</span>
-                </span>
-            </label>
         </div>
 
         <div class="card">
             <h2 style="margin-top:0;">Nachgelagerte KI-Prüfung (Gateway)</h2>
-            <p class="muted" style="margin-top:-4px;">Unabhängig vom Add-in: Würde eine Mail <strong>unverschlüsselt an externe Empfänger</strong> gehen, prüft das lokale „gute" Modell (7B, nur auf diesem Server, kein Datenabfluss) noch einmal auf schutzbedürftige Inhalte. Der bewusste „Trotzdem senden"-Override im Add-in wird respektiert. Fällt der KI-Dienst aus, wird normal zugestellt (kein Mailstau).</p>
+            <p class="muted" style="margin-top:-4px;">Unabhängig vom Add-in: Würde eine Mail <strong>unverschlüsselt an externe Empfänger</strong> gehen, prüft das Gateway sie mit <strong>denselben Regeln wie das Plugin</strong> (Anhang-Namen, Stichworte, Geburtsdatum, KI) — nur mit dem <strong>review_score</strong> je Regel gewichtet und dem großen 7B-Modell als KI-Regel (nur auf diesem Server, kein Datenabfluss). Der bewusste „Trotzdem senden"-Override im Add-in wird respektiert. Fällt der KI-Dienst aus, zählen die übrigen Regeln weiter; ist gar nichts erreichbar, wird normal zugestellt (kein Mailstau).</p>
 
             <div class="grid2" style="margin-top:14px;">
                 <div>
@@ -60,10 +59,10 @@
                     <p class="muted" style="margin-top:6px;">„Nur Log" eignet sich zum Kalibrieren: Im Protokoll erscheint <em>llm_flagged</em> für jede Mail, die abgesichert worden wäre. „Log und Absichern" leitet ab Schwellwert wirklich um (Zertifikat vorhanden → S/MIME, sonst → Portal) und informiert den Absender per Mail.</p>
                 </div>
                 <div>
-                    <label>Schwellwert (KI-Score 1–100, ab dem reagiert wird)</label>
-                    <input type="number" wire:model="llm_score" min="1" max="100" style="max-width:120px;">
-                    @error('llm_score')<div class="error">{{ $message }}</div>@enderror
-                    <p class="muted" style="margin-top:6px;">Höher = strenger (weniger Fehlalarme, mehr Durchlass). Richtwert 70 — das Modell trennt im Test sauber: harmlose Mails 0, schutzbedürftige 85–100.</p>
+                    <label>Schwellwert (Gesamt-Score, ab dem reagiert wird)</label>
+                    <input type="number" wire:model="review_threshold" min="1" max="1000" style="max-width:120px;">
+                    @error('review_threshold')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">Summe der <strong>review_score</strong>-Beiträge aller zutreffenden Regeln, gegen diesen Wert geprüft — eigener Wert, unabhängig vom Plugin-Schwellwert oben. Höher = strenger.</p>
                 </div>
             </div>
         </div>
@@ -71,77 +70,20 @@
         <button type="submit" class="btn" style="margin:-6px 0 18px;">Einstellungen speichern</button>
     </form>
 
-    @if ($debug || $debugLogs->isNotEmpty())
-        <div class="card" style="border:1px solid #fde68a;">
-            <div style="display:flex; align-items:center; gap:12px;">
-                <h2 style="margin:0;">Diagnose @if($debug)<span class="badge warn">aktiv</span>@endif</h2>
-                @if ($debugLogs->isNotEmpty())
-                    <button class="btn small danger" style="margin-left:auto;" wire:click="purgeDebug" wire:confirm="Alle gespeicherten Mailinhalte der Diagnose löschen? (Kennzahlen bleiben erhalten)">Diagnose-Inhalte löschen ({{ $debugLogs->count() }})</button>
-                @endif
-            </div>
-            <p class="muted" style="margin:6px 0 0;">Die letzten geprüften Mails mit vollständigem Inhalt und Einzelwertung. Schwellwert aktuell: <strong>{{ $threshold }}</strong> — ab diesem Gesamt-Score wird gefragt.</p>
-
-            @forelse ($debugLogs as $d)
-                <details style="margin-top:12px; border:1px solid #e5e7eb; border-radius:8px; padding:0;">
-                    <summary style="cursor:pointer; padding:10px 14px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-                        <span class="mono" style="white-space:nowrap;">{{ $d->created_at->format('d.m. H:i') }}</span>
-                        <span>Score <strong>{{ $d->score }}</strong></span>
-                        @if ($d->asked)<span class="badge warn">gefragt</span>@else<span class="badge off">nicht gefragt</span>@endif
-                        <span class="muted">{{ $d->external_count }} externe/{{ $d->recipient_count }} Empf.</span>
-                        <span class="muted" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:340px;">{{ $d->debug_subject ?: '(ohne Betreff)' }}</span>
-                    </summary>
-                    <div style="padding:4px 14px 14px;">
-                        <table class="plain" style="margin-bottom:10px;">
-                            <thead><tr><th>Regel</th><th style="text-align:right;">Beitrag</th></tr></thead>
-                            <tbody>
-                            @foreach ($d->debug_rules ?? [] as $rr)
-                                <tr @if(($rr['contribution'] ?? 0) > 0) style="background:#fffbeb;" @endif>
-                                    <td>
-                                        {{ $rr['name'] ?? $rr['type'] ?? '?' }} <span class="muted">({{ $rr['type'] ?? '' }})</span>
-                                        @if (($rr['type'] ?? '') === 'llm')
-                                            <br><span class="muted" style="font-size:12px;">
-                                            @if (($rr['llm_available'] ?? false))
-                                                KI-Urteil: <strong>{{ ($rr['llm_sensibel'] ?? false) ? 'ja (sensibel)' : 'nein' }}</strong>, KI-Wert {{ $rr['llm_score'] ?? '?' }}@if(($rr['llm_factor'] ?? 0) > 0) · Faktor {{ $rr['llm_factor'] }}%@endif
-                                            @else
-                                                KI-Dienst nicht verfügbar
-                                            @endif
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td style="text-align:right;">@if(($rr['contribution'] ?? 0) > 0)<strong>+{{ $rr['contribution'] }}</strong>@else<span class="muted">0 / {{ $rr['max'] ?? '?' }}</span>@endif</td>
-                                </tr>
-                            @endforeach
-                            <tr><td style="text-align:right;"><strong>Summe</strong></td><td style="text-align:right;"><strong>{{ $d->score }}</strong> {{ $d->score >= $threshold ? '≥' : '<' }} {{ $threshold }}</td></tr>
-                            </tbody>
-                        </table>
-                        @if (!empty($d->debug_attachments))
-                            <div style="margin-bottom:8px;"><strong>Anhänge:</strong> <span class="mono">{{ implode(', ', $d->debug_attachments) }}</span></div>
-                        @endif
-                        <div><strong>Betreff:</strong> {{ $d->debug_subject ?: '(leer)' }}</div>
-                        <div style="margin-top:6px;"><strong>Text:</strong></div>
-                        <pre style="white-space:pre-wrap; word-break:break-word; background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:10px; font-size:12.5px; max-height:340px; overflow:auto;">{{ $d->debug_body }}</pre>
-                    </div>
-                </details>
-            @empty
-                <p class="muted" style="margin-top:12px;">Noch keine Diagnose-Einträge. Aktivieren Sie den Modus oben und senden Sie eine Testmail über das Add-in.</p>
-            @endforelse
-        </div>
-    @endif
-
     <div class="card">
         <div style="display:flex; align-items:center;">
             <h2 style="margin:0;">Regeln</h2>
             <button class="btn" style="margin-left:auto;" wire:click="newRule">Neue Regel</button>
         </div>
         <table style="margin-top:12px;">
-            <thead><tr><th>Name</th><th>Typ</th><th>Score</th><th>Status</th><th>Feuerte (90 T.)</th><th>löste Nachfrage aus</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Typ</th><th>Score<br><span class="muted" style="font-weight:400;font-size:11px;">Plugin / Nachgel.</span></th><th>Status</th><th>Feuerte (90 T.)</th><th>löste Nachfrage aus</th><th></th></tr></thead>
             <tbody>
             @forelse ($rules as $r)
                 @php $s = $stats[$r->id] ?? null; @endphp
                 <tr>
                     <td><strong>{{ $r->name }}</strong></td>
-                    <td class="muted">{{ $r->typeLabel() }}@if($r->type === 'keyword') (≥{{ $r->threshold }})@elseif($r->type === 'birthdate') (≥{{ $r->threshold }} J.)@elseif($r->type === 'llm' && $r->threshold > 0) (+{{ $r->threshold }}% KI-Wert)@endif</td>
-                    <td>+{{ $r->score }}</td>
+                    <td class="muted">{{ $r->typeLabel() }}@if($r->type === 'keyword') (≥{{ $r->threshold }})@elseif($r->type === 'birthdate') (≥{{ $r->threshold }} J.)@elseif($r->type === 'llm' && ($r->threshold > 0 || $r->review_threshold > 0)) (KI-Faktor {{ $r->threshold }}% / {{ $r->review_threshold }}%)@endif</td>
+                    <td class="mono" style="white-space:nowrap;">+{{ $r->score }} <span class="muted">/</span> +{{ $r->review_score }}</td>
                     <td>@if ($r->active)<span class="badge ok">aktiv</span>@else<span class="badge off">inaktiv</span>@endif</td>
                     <td class="muted">{{ $s['fired'] ?? 0 }}×</td>
                     <td class="muted">{{ $s['asked'] ?? 0 }}×</td>
@@ -204,15 +146,28 @@
                     </div>
                 @elseif ($type === 'llm')
                     <div>
-                        <label>Faktor auf den KI-Wert (%)</label>
+                        <label>Faktor Plugin (% des KI-Werts, kleines Modell)</label>
                         <input type="number" wire:model="rule_threshold" min="0" max="100">
-                        <span class="muted" style="font-size:12px;">z.B. 50 ⇒ halber KI-Wert; 0 ⇒ KI-Wert ignorieren</span>
+                        <span class="muted" style="font-size:12px;">z.B. 30 ⇒ knapp ein Drittel des KI-Werts; 0 ⇒ KI-Wert ignorieren</span>
+                    </div>
+                    <div>
+                        <label>Faktor Nachgelagert (% des KI-Werts, großes Modell)</label>
+                        <input type="number" wire:model="review_rule_threshold" min="0" max="100">
+                        @error('review_rule_threshold')<div class="error">{{ $message }}</div>@enderror
+                        <span class="muted" style="font-size:12px;">z.B. 100 ⇒ Beitrag = KI-Wert (0–100) direkt</span>
                     </div>
                 @endif
                 <div>
-                    <label>{{ $type === 'llm' ? 'Punkte bei „Ja" (sensibel)' : 'Score-Beitrag bei Treffer' }}</label>
+                    <label>Score Plugin{{ $type === 'llm' ? ' (Punkte bei „Ja")' : '' }}</label>
                     <input type="number" wire:model="score" min="0" max="1000">
                     @error('score')<div class="error">{{ $message }}</div>@enderror
+                    <span class="muted" style="font-size:12px;">Live-Rückfrage im Outlook-Add-in</span>
+                </div>
+                <div>
+                    <label>Score Nachgelagert</label>
+                    <input type="number" wire:model="review_score" min="0" max="1000">
+                    @error('review_score')<div class="error">{{ $message }}</div>@enderror
+                    <span class="muted" style="font-size:12px;">Serverprüfung vor unverschl. Versand (0 = zählt dort nicht)</span>
                 </div>
                 <div style="display:flex; align-items:flex-end;">
                     <label style="display:flex; gap:8px; align-items:center; margin:0;">
@@ -234,7 +189,49 @@
             <tr><td>davon gefragt</td><td style="text-align:right;">{{ number_format($logSummary['asked'], 0, ',', '.') }}</td></tr>
             <tr><td>ohne Frage (S/MIME-Ausnahme)</td><td style="text-align:right;">{{ number_format($logSummary['smime'], 0, ',', '.') }}</td></tr>
         </table>
-        <div class="muted" style="margin-top:8px;">Es werden nur Score und ausgelöste Regeln protokolliert — keine Betreffzeilen, Texte oder Anhangsnamen.</div>
+        <div class="muted" style="margin-top:8px;">Add-in-Prüfungen protokollieren nur Score und ausgelöste Regeln — keine Betreffzeilen, Texte oder Anhangsnamen (außer im Diagnose-Modus). Die nachgelagerte Prüfung speichert Inhalte zur Kalibrierung, entfernt sie aber automatisch nach 7 Tagen.</div>
     </div>
+    </div> {{-- Ende Tab „Regeln & Einstellungen" --}}
+
+    <div @class(['tabpane', 'is-active' => $tab === 'diagnose'])>
+        <div class="card" style="border:1px solid #fde68a;">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <h2 style="margin:0;">Add-in-Diagnose @if($debug)<span class="badge warn">aktiv</span>@endif</h2>
+                @if ($debugLogs->isNotEmpty() || $reviewLogs->isNotEmpty())
+                    <button class="btn small danger" style="margin-left:auto;" wire:click="purgeDebug" wire:confirm="Alle gespeicherten Mailinhalte löschen (Add-in-Diagnose UND nachgelagerte Prüfung)? Die Kennzahlen bleiben erhalten.">Alle Inhalte löschen</button>
+                @endif
+            </div>
+
+            <label class="opt" style="margin-top:10px;">
+                <input type="checkbox" wire:model.live="debug">
+                <span>
+                    <strong>Diagnose-/Lernmodus (Add-in-Prüfungen)</strong><br>
+                    <span class="muted">Speichert zu jeder Add-in-Prüfung den <strong>kompletten Text</strong>, die Anhang-Namen und die Einzelwertung jeder Regel. Achtung: echte Mailinhalte (ggf. mit Sozialdaten) landen in der Datenbank — nur zur zeitlich begrenzten Analyse aktivieren, danach ausschalten und Inhalte löschen. Wirkt sofort beim Anhaken.</span>
+                </span>
+            </label>
+
+            <p class="muted" style="margin:10px 0 0;">Geprüfte Mails mit vollständigem Inhalt und Einzelwertung. Schwellwert aktuell: <strong>{{ $threshold }}</strong> — ab diesem Gesamt-Score wird gefragt.</p>
+
+            @forelse ($debugLogs as $d)
+                @include('livewire.admin._classify-log-entry', ['d' => $d, 'threshold' => $threshold, 'overLabel' => 'gefragt', 'underLabel' => 'nicht gefragt'])
+            @empty
+                <p class="muted" style="margin-top:12px;">Noch keine Diagnose-Einträge. Aktivieren Sie den Modus oben und senden Sie eine Testmail über das Add-in.</p>
+            @endforelse
+            <div style="margin-top:14px;">{{ $debugLogs->links('pagination') }}</div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin:0;">Nachgelagerte Prüfung — Auswertung</h2>
+            <p class="muted" style="margin:6px 0 0;">Jede vom Gateway nachgeprüfte Mail (wäre sonst unverschlüsselt an Externe gegangen) mit Einzelwertung und Inhalt — auch unterhalb der Schwelle. Schwellwert aktuell: <strong>{{ $reviewThreshold }}</strong>. Inhalte werden nach <strong>7 Tagen automatisch entfernt</strong>, die Kennzahlen bleiben; „Alle Inhalte löschen" oben räumt auch hier sofort auf.</p>
+
+            @forelse ($reviewLogs as $d)
+                @include('livewire.admin._classify-log-entry', ['d' => $d, 'threshold' => $reviewThreshold, 'overLabel' => 'über Schwelle', 'underLabel' => 'unter Schwelle'])
+            @empty
+                <p class="muted" style="margin-top:12px;">Noch keine nachgelagerten Prüfungen protokolliert (Modus „{{ $llm_mode }}"). Einträge entstehen, sobald eine Mail unverschlüsselt an Externe ginge und der Modus nicht „off" ist.</p>
+            @endforelse
+            <div style="margin-top:14px;">{{ $reviewLogs->links('pagination') }}</div>
+        </div>
+    </div> {{-- Ende Tab „Diagnose-Logs" --}}
+
     <style>table.plain{width:100%;border-collapse:collapse;font-size:13.5px;} table.plain td{padding:5px 4px;border-bottom:1px solid #f0f1f3;}</style>
 </div>
