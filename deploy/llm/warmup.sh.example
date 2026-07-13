@@ -1,0 +1,19 @@
+#!/bin/bash
+# Warmhaltung mit EXAKT dem Anfrageprofil einer echten Klassifizierung
+# (System-Prompt, langer Text, JSON-Format, max_tokens) — damit auch die
+# Grammatik-/KV-/Rechenpfade warm bleiben.
+for i in $(seq 1 60); do
+  [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/health 2>/dev/null)" = "200" ] && break
+  sleep 1
+done
+SYS='Datenschutz-Filter einer Kinder-/Jugendhilfe-Einrichtung. Zweck: NUR Klientendaten schuetzen. sensibel=true nur, wenn die Mail schutzbeduerftige Daten von KLIENTEN/betreuten Personen im Fall-/Fachkontext enthaelt (Gesundheit, Diagnose, Familie, Sorgerecht, Kindeswohl, Hilfeplan, Name+Geburtsdatum). Private Angelegenheiten des Absenders und seiner EIGENEN Familie (eigene Termine, eigene Gesundheit, eigene Kinder, eigene Rechnungen) sowie Organisatorisches/Technisches = nein, score niedrig. Antworte NUR JSON: {"sensibel":true|false,"score":0-100}'
+BODY=$(printf 'Aufwaermtext zur Warmhaltung des Klassifizierers Zeile. %.0s' {1..30})
+python3 - "$SYS" "$BODY" <<'PY' || true
+import json,sys,urllib.request
+sys_p,body=sys.argv[1],sys.argv[2]
+p={"temperature":0,"max_tokens":24,"response_format":{"type":"json_object"},
+   "messages":[{"role":"system","content":sys_p},{"role":"user","content":body}]}
+try:
+    urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:8081/v1/chat/completions",json.dumps(p).encode(),{"Content-Type":"application/json"}),timeout=30).read()
+except Exception: pass
+PY

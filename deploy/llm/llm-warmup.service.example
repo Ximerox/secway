@@ -1,0 +1,7 @@
+[Unit]
+Description=SecWay LLM warmhalten
+After=llm-classify.service
+[Service]
+Type=oneshot
+User=llm
+ExecStart=/opt/llm/warmup.sh

@@ -110,18 +110,33 @@ Betriebssystem-Sicherheitsupdates installiert `unattended-upgrades` automatisch;
   (`smime:recheck-harvested`) und bei validierbarer Kette aktiviert. Bleibt ein Zertifikat
   inaktiv, ist es selbstsigniert/privat — dann bewusst manuell unter Admin → Zertifikate
   freigeben.
-- **Lokale KI-Prüfung (optional):** Ein llama.cpp-Dienst (`llm-classify.service`, nur localhost:8081,
-  Modell Qwen2.5-7B) bewertet ausgehende Mails auf schutzbedürftige Sozialdaten. Zwei Einsatzorte
-  (beide Admin → Sicher versenden): **(a)** als Send-Regel vom Typ „Lokale KI-Prüfung" — zählt zum
-  Score der Sende-Rückfrage im Add-in; **(b)** als **nachgelagerte KI-Prüfung** im Gateway: Würde
-  eine Mail unverschlüsselt an Externe gehen, prüft das Modell noch einmal. Drei Modi: *Aus*,
-  *Nur Log* (protokolliert als `llm_flagged`, was abgesichert worden wäre — zum Kalibrieren des
-  Schwellwerts) und *Log und Absichern* (leitet ab Schwellwert wirklich um: Zertifikat → S/MIME,
-  sonst → Portal, Absender bekommt eine Info-Mail; Protokoll `llm_secured`). Ein bewusstes
-  „Trotzdem senden" im Add-in wird respektiert (Protokoll `send_override`). Fail-safe: Ist der
-  Dienst aus, trägt die Regel 0 bei bzw. die Mail wird normal zugestellt — kein Mailstau.
-  Stoppen/Starten: `systemctl {stop|start} llm-classify`. Ressourcengrenzen (8 Kerne/7 GB) in der
-  systemd-Unit — der Mailbetrieb hat Vorrang. Die Mailinhalte verlassen den Server nicht.
+- **Lokale KI-Prüfung (optional):** Zwei llama.cpp-Dienste, beide nur localhost (Beispiel-Units
+  in `deploy/llm/`): `llm-classify.service` (Port 8081, **kleines** Modell, z. B. Qwen2.5-3B — muss
+  im Zeitbudget des Add-ins antworten, real < 1 s) und `llm-review.service` (Port 8082, **großes**
+  Modell, z. B. Qwen2.5-7B — gründlicher, Latenz egal). Zwei Einsatzorte (beide Admin → Sicher
+  versenden): **(a)** als Send-Regel vom Typ „Lokale KI-Prüfung" — kleines Modell, zählt zum Score
+  der Sende-Rückfrage im Add-in; **(b)** als **nachgelagerte Prüfung** im Gateway: Würde eine Mail
+  unverschlüsselt an Externe gehen, läuft dieselbe Regel-Engine wie im Add-in noch einmal —
+  jede Regel mit eigenem *Score Nachgelagert*, die KI-Regel mit dem großen Modell und eigenem
+  Faktor, eigener Schwellwert. Drei Modi: *Aus*, *Nur Log* (protokolliert als `llm_flagged`, was
+  abgesichert worden wäre — zum Kalibrieren; Tab „Diagnose-Logs" zeigt jede Prüfung mit
+  Einzelwertung und Inhalt, Inhalte werden nach 7 Tagen automatisch entfernt) und *Log und
+  Absichern* (leitet ab Schwellwert wirklich um: Zertifikat → S/MIME, sonst → Portal, Absender
+  bekommt eine Info-Mail; Protokoll `llm_secured`). Normal durchgeleitete Mails tragen im
+  Protokoll den geprüften Score als `ki_score`. Ein bewusstes „Trotzdem senden" im Add-in wird
+  respektiert (Protokoll `send_override`, mit Score und ausgelösten Regeln). Der KI-Prompt ist
+  auf **Klientenschutz** ausgelegt: rein private Mails des Absenders (eigene Gesundheit/Familie
+  in Ich-Form) werden bewusst niedrig bewertet. Fail-safe: Ist ein Dienst aus, trägt die
+  KI-Regel 0 bei, die übrigen Regeln zählen weiter — kein Mailstau. Stoppen/Starten:
+  `systemctl {stop|start} llm-classify llm-review`. Ressourcengrenzen in den systemd-Units
+  (CPUWeight niedrig — der Mailbetrieb hat Vorrang); `--mlock` hält die Modelle im RAM
+  (konstante Latenz). Die Mailinhalte verlassen den Server nicht.
+- **Add-in-Verhalten pro Benutzer steuern:** Admin → Benutzer — Spalte *Rückfrage* schaltet die
+  „Sicher versenden?"-Rückfrage pro Absender an/aus (aus = Add-in bekommt sofort Freigabe);
+  Spalte *Signatur* bestimmt, ob der Signaturblock im Add-in beim Schreiben (*Client*) oder erst
+  beim Versand im Gateway (*Gateway*) angefügt wird. Beide Flags überleben den Entra-Sync.
+- **Portal-Kennwort neu senden:** Admin → Nachrichten — der 🔑-Knopf hinter dem einzelnen
+  Empfänger erzeugt ein neues Kennwort **nur für diesen Empfänger** (die übrigen behalten ihres).
 - **Impressum/Datenschutz ändern:** Admin → Einstellungen → HTML-Felder unten.
 - **Eigenes Kennwort / Benutzername ändern:** Admin → Konto.
 - **Weiteren Admin-Benutzer anlegen:** per Tinker (siehe INSTALL.md, „First admin user").

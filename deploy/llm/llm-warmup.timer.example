@@ -1,0 +1,7 @@
+[Unit]
+Description=SecWay LLM alle 2 Minuten warmhalten
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+[Install]
+WantedBy=timers.target

@@ -319,3 +319,53 @@ swaks --server 127.0.0.1:25 --from user@example.org --to someone@external.exampl
 Expected: link mail arrives immediately, password mail ~2 minutes later, message readable in
 the portal, events visible under Admin → Protokoll. A mail **without** the auth header must be
 deferred with `450` and logged as `ingest_rejected`.
+
+## 12. Local LLM classification (optional)
+
+Entirely optional — everything else works without it. Two llama.cpp servers on localhost feed
+the "Lokale KI-Prüfung" send rule (small model, low latency, port 8081) and the post-hoc
+review at the gateway (larger model, port 8082). Mail content never leaves the machine.
+
+```bash
+# Build llama.cpp with native optimizations (needs cmake, g++, libcurl4-openssl-dev)
+useradd -r -s /usr/sbin/nologin llm
+mkdir -p /opt/llm/models && cd /opt/llm
+git clone https://github.com/ggml-org/llama.cpp && cd llama.cpp
+cmake -B build -DGGML_NATIVE=ON && cmake --build build --target llama-server -j
+
+# Models (GGUF, Q4_K_M): small for the add-in path, large for the review
+cd /opt/llm/models
+wget https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf
+wget https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf
+chown -R llm:llm /opt/llm
+```
+
+Install the systemd units from `deploy/llm/` (adjust model paths, threads and memory limits
+to your hardware; `--mlock` pins the model in RAM for constant latency — size your RAM
+accordingly, ~2 GB for the 3B plus ~5 GB for the 7B):
+
+```bash
+cp deploy/llm/llm-classify.service.example /etc/systemd/system/llm-classify.service
+cp deploy/llm/llm-review.service.example   /etc/systemd/system/llm-review.service
+cp deploy/llm/warmup.sh.example            /opt/llm/warmup.sh && chmod +x /opt/llm/warmup.sh
+cp deploy/llm/llm-warmup.service.example   /etc/systemd/system/llm-warmup.service
+cp deploy/llm/llm-warmup.timer.example     /etc/systemd/system/llm-warmup.timer
+systemctl daemon-reload
+systemctl enable --now llm-classify llm-review llm-warmup.timer
+curl -s http://127.0.0.1:8081/health && curl -s http://127.0.0.1:8082/health
+```
+
+`.env` (defaults shown — only set them to override):
+
+```ini
+MGW_LLM_ENDPOINT=http://127.0.0.1:8081/v1/chat/completions
+MGW_LLM_TIMEOUT=5
+MGW_LLM_REVIEW_ENDPOINT=http://127.0.0.1:8082/v1/chat/completions
+MGW_LLM_REVIEW_TIMEOUT=9
+```
+
+Then, in the admin UI (Sicher versenden): create/enable the send rule of type
+"Lokale KI-Prüfung" and pick the post-hoc review mode (start with *Nur Log* to calibrate the
+threshold — the Diagnose-Logs tab shows every reviewed mail with a per-rule breakdown).
+Fail-safe throughout: if a service is down, the LLM rule contributes 0 and mail is never
+delayed or queued.

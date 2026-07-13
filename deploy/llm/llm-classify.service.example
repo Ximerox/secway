@@ -1,0 +1,32 @@
+[Unit]
+Description=SecWay lokaler Klassifizierer (llama.cpp, Qwen2.5-3B, Live-Senden)
+After=network.target
+
+[Service]
+User=llm
+Group=llm
+ExecStart=/opt/llm/llama.cpp/build/bin/llama-server \
+  --model /opt/llm/models/qwen2.5-3b-instruct-q4_k_m.gguf \
+  --host 127.0.0.1 --port 8081 \
+  --threads 16 --ctx-size 4096 --parallel 1 \
+  --batch-size 2048 --ubatch-size 2048 \
+  --mlock \
+  --no-webui
+ExecStartPost=/opt/llm/warmup.sh
+Restart=on-failure
+RestartSec=5
+# Mailbetrieb hat Vorrang; Modell fest im RAM (mlock) -> konstant schnell
+LimitMEMLOCK=infinity
+CPUQuota=1600%
+MemoryMax=11G
+Nice=10
+CPUWeight=20
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/opt/llm
+CapabilityBoundingSet=CAP_IPC_LOCK
+
+[Install]
+WantedBy=multi-user.target

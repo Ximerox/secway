@@ -84,19 +84,27 @@ S/MIME **signing** above.
   encryption, RSA (PKCS#1 v1.5) key transport, SHA-256 RSA signatures; interoperates with
   common gateways and mail clients
 - **Signature-block module** (optional) — server-side e-mail footers from Entra ID with
-  placeholders, rules, inline images, per-sender QR codes and optional Sent-Items update
+  placeholders, rules, inline images, per-sender QR codes and optional Sent-Items update.
+  A companion **compose add-in** (`outlook-addin-signature/`) inserts the block while writing
+  (shared-mailbox aware via `item.from` + `OnMessageFromChanged`); a per-user switch in the
+  admin decides whether the block is added in the client or at the gateway.
 - **„Send securely?" Outlook add-in** (optional) — an OnMessageSend add-in that scores
   outbound mail against admin-managed rules (sensitive attachment names, keyword thresholds,
   past-dated birthdates, local-LLM verdict) and prompts the sender to tag it for secure
   delivery; content stays local (only subject/body/attachment-names sent), scoring +
-  rule-precision logged without message content. Backend under `/api/classify`, add-in in
-  `outlook-addin/`.
+  rule-precision logged without message content. The prompt can be enabled per user in the
+  admin. A deliberate "send anyway" is recorded in the audit log (`send_override`). Backend
+  under `/api/classify`, add-in in `outlook-addin/`.
 - **Post-hoc LLM review** (optional) — mail that would otherwise leave unencrypted to external
-  recipients is re-checked at the gateway by a **local** llama.cpp model (no data leaves the
-  server). Three modes: off, log-only (records what would have been secured — for threshold
-  calibration), and secure (reroutes to S/MIME or portal above the threshold and notifies the
-  sender). A deliberate "send anyway" override from the add-in is always respected; if the LLM
-  service is down, mail passes through normally (fail-safe, no queue buildup).
+  recipients is re-checked at the gateway with the **same rule engine** as the add-in
+  (attachment names, keywords, birthdates, LLM verdict), each rule carrying its own review
+  weight, and a **local** llama.cpp model as the LLM rule (no data leaves the server; a
+  smaller model serves the low-latency add-in path, a larger one the review). Three modes:
+  off, log-only (records what would have been secured — for threshold calibration, with a
+  paginated per-rule breakdown in the admin, contents auto-purged after 7 days), and secure
+  (reroutes to S/MIME or portal above the threshold and notifies the sender). A deliberate
+  "send anyway" override from the add-in is always respected; if the LLM service is down,
+  the remaining rules still count and mail never queues up (fail-safe).
 
 ## Requirements
 

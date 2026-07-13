@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Console\Commands\SendReminders;
 use App\Mail\PasswordMail;
 use App\Models\AuditEvent;
+use App\Models\MessageRecipient;
 use App\Models\SecureMessage;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -47,33 +48,28 @@ class Messages extends Component
     }
 
     /**
-     * Sendet dem/den Empfänger(n) ein NEUES Kennwort. Das ursprüngliche liegt
+     * Sendet EINEM Empfänger ein NEUES Kennwort (gezielt pro Empfänger — die
+     * übrigen Empfänger der Nachricht behalten ihres). Das ursprüngliche liegt
      * nur als Hash vor und ist nicht wiederherstellbar, daher wird ein frisches
      * erzeugt, der Hash aktualisiert und per Mail zugestellt.
      */
-    public function resendPassword(int $id): void
+    public function resendPassword(int $recipientId): void
     {
-        $msg = SecureMessage::with('recipients')->findOrFail($id);
-        $sent = 0;
-        foreach ($msg->recipients as $r) {
-            $password = self::generatePassword();
-            $r->password_hash = Hash::make($password);
-            $r->pending_password = null;
-            $r->password_due_at = now();
-            $r->password_sent_at = now();
-            $r->save();
-            try {
-                $r->setRelation('message', $msg);
-                Mail::to($r->email)->send(new PasswordMail($msg, $password));
-                AuditEvent::log('password_sent', $msg, $r, details: ['resent' => true]);
-                $sent++;
-            } catch (Throwable $e) {
-                Log::error("Kennwort-Neuversand für Empfänger {$r->id} fehlgeschlagen: ".$e->getMessage());
-            }
+        $r = MessageRecipient::with('message')->findOrFail($recipientId);
+        $password = self::generatePassword();
+        $r->password_hash = Hash::make($password);
+        $r->pending_password = null;
+        $r->password_due_at = now();
+        $r->password_sent_at = now();
+        $r->save();
+        try {
+            Mail::to($r->email)->send(new PasswordMail($r->message, $password));
+            AuditEvent::log('password_sent', $r->message, $r, details: ['resent' => true]);
+            session()->flash('ok', "Neues Kennwort an {$r->email} versendet.");
+        } catch (Throwable $e) {
+            Log::error("Kennwort-Neuversand für Empfänger {$r->id} fehlgeschlagen: ".$e->getMessage());
+            session()->flash('ok', 'Kennwortversand fehlgeschlagen – siehe Log.');
         }
-        session()->flash('ok', $sent > 0
-            ? "Neues Kennwort an {$sent} Empfänger versendet."
-            : 'Kennwortversand fehlgeschlagen – siehe Log.');
     }
 
     /** Kennwort ohne leicht verwechselbare Zeichen, Format xxxx-xxxx-xxxx. */
