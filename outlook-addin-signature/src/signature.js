@@ -19,6 +19,13 @@ var SECWAY_URL = "https://secway.example.org";
 var SECWAY_TOKEN = "REPLACE-WITH-MGW_SIGNATURE_TOKEN";
 
 function onComposeHandler(event) {
+    // Outlook Classic (Windows): JavaScript-only-Laufzeit ohne fetch/Timer —
+    // Handler würde crashen. Sofort abschließen; das Gateway hängt die
+    // Signatur serverseitig an (Auffangnetz-Pfad, X-MGW-Signed fehlt ja).
+    if (typeof fetch !== "function" || typeof setTimeout !== "function") {
+        try { event.completed(); } catch (e) { /* egal */ }
+        return;
+    }
     // Sicherheitsnetz: nach spätestens 8 s wird das Ereignis IMMER abgeschlossen.
     var done = false;
     function finish() {

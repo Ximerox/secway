@@ -45,3 +45,16 @@ Läuft in Outlook Desktop (Windows/Mac), OWA und der Outlook-App (Android/iOS).
 Das Add-in ist eine Erinnerung, kein Torwächter: Es greift nur in Outlook/OWA/Outlook-App,
 nicht bei Fremd-Clients oder serverseitigen Weiterleitungsregeln. Die endgültige
 Verantwortung bleibt beim Absender.
+
+## Outlook Classic (Windows): .well-known-Datei
+
+Klassisches Outlook lädt ereignisbasierte Add-ins über eine JavaScript-Laufzeit
+und fragt dabei `/.well-known/microsoft-officeaddins-allowed.json` am Add-in-Host
+ab (Liste der autorisierten JS-Dateien, u. a. für SSO). Fehlt sie, kann die
+Aktivierung in Classic scheitern. Lege sie am Web-Root an (gitignoriert, weil
+host-spezifisch) — Vorlage: `deploy/microsoft-officeaddins-allowed.json.example`.
+Ablageort hier: `public/.well-known/microsoft-officeaddins-allowed.json`.
+
+Zusätzlich prüfen beide Add-ins zur Laufzeit, ob `fetch`/`setTimeout` vorhanden
+sind (in der Classic-JS-Laufzeit nicht der Fall) und geben dann sofort frei bzw.
+überlassen dem Gateway die Signatur — so blockiert Classic nie den Versand.

@@ -23,6 +23,17 @@ const SECWAY_TOKEN = "REPLACE-WITH-MGW_CLASSIFY_TOKEN";
 const SECWAY_TAG_FALLBACK = "REPLACE-WITH-SUBJECT-TAG";
 
 function onMessageSendHandler(event) {
+    // Outlook Classic (Windows) führt ereignisbasierte Add-ins in einer
+    // JavaScript-only-Laufzeit aus — dort fehlen fetch UND Timer (setTimeout).
+    // Ohne beides kann weder SecWay gefragt noch der Wächter gestellt werden;
+    // ein Weiterlaufen würde crashen, event.completed käme nie und der
+    // SoftBlock würde JEDEN Versand blockieren (am 16.07.2026 bei einer
+    // Classic-Nutzerin passiert). Daher: sofort freigeben — die nachgelagerte
+    // Prüfung im Gateway bleibt als Netz.
+    if (typeof fetch !== "function" || typeof setTimeout !== "function") {
+        try { event.completed({ allowEvent: true }); } catch (e) { /* egal */ }
+        return;
+    }
     const item = Office.context.mailbox.item;
 
     // Sicherheitsnetz NUR für Einsammeln + Klassifizieren (Office-Callbacks,
@@ -166,6 +177,7 @@ function gatherRecipients(item, done) {
 
 /* SecWay fragen; jeder Fehler/Timeout => senden (verdict.ask=false) */
 function classify(payload, done) {
+    if (typeof fetch !== "function") { done({ ask: false }); return; } // Classic-Laufzeit
     const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
     if (ctrl) setTimeout(function () { ctrl.abort(); }, 6000);
     fetch(SECWAY_URL + "/api/classify", {
@@ -213,6 +225,7 @@ function secureSend(event) {
 
 /* Aktuelles Tag vom Server; bei Fehler der beim Deploy injizierte Rückfall. */
 function fetchTag(done) {
+    if (typeof fetch !== "function") { done(SECWAY_TAG_FALLBACK); return; } // Classic-Laufzeit
     const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
     if (ctrl) setTimeout(function () { ctrl.abort(); }, 4000);
     fetch(SECWAY_URL + "/api/subject-tag", {

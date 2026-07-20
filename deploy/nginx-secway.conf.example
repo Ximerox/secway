@@ -17,7 +17,7 @@ server {
     # Add-in-Dateien nicht cachen, damit Aktualisierungen bei den Clients
     # (Outlook cacht ereignisbasierte Add-ins aggressiv) zeitnah ankommen.
     location /addin/ {
-        add_header Cache-Control "no-cache, must-revalidate" always;
+        add_header Cache-Control "max-age=300" always;
         try_files $uri =404;
     }
 

@@ -1,0 +1,6 @@
+{
+    "allowed": [
+        "https://secway.example.org/addin/classify.js",
+        "https://secway.example.org/addin/sig/signature.js"
+    ]
+}
