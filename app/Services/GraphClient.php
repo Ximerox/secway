@@ -83,6 +83,33 @@ class GraphClient
         return $resp->json('value')[0] ?? null;
     }
 
+    /**
+     * Diagnose (rein lesend): Liegt in „Gesendete Elemente" überhaupt eine
+     * Nachricht mit diesem Betreff? Wird genutzt, wenn die exakte Suche über
+     * die Message-ID nichts fand — dann lässt sich unterscheiden zwischen
+     * „Kopie ist da, nur unter anderer Message-ID" (harmlos, nur nicht ersetzt)
+     * und „gar keine Kopie in Gesendet" (das eigentliche Problem). Liefert nur
+     * true/false, kein Inhalt. Fehler werden geschluckt (Diagnose, nie kritisch).
+     */
+    public function sentItemExistsBySubject(string $user, string $subject): bool
+    {
+        $subject = trim($subject);
+        if ($subject === '') {
+            return false;
+        }
+        try {
+            $filter = rawurlencode("subject eq '".str_replace("'", "''", $subject)."'");
+            $resp = Http::withToken($this->token())->timeout(30)->get(
+                'https://graph.microsoft.com/v1.0/users/'.rawurlencode($user)
+                .'/mailFolders/sentitems/messages?$filter='.$filter.'&$select=id&$top=1'
+            );
+
+            return $resp->successful() && ! empty($resp->json('value'));
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     /** Legt eine Nachricht direkt im Ordner „Gesendete Elemente" an. */
     public function createSentItem(string $user, array $payload): array
     {

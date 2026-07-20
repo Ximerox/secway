@@ -67,7 +67,15 @@ class UpdateSentItems extends Command
         if ($orig === null) {
             // Kopie liegt evtl. noch nicht im Ordner — später erneut, irgendwann aufgeben
             if ($row->created_at->lt(now()->subMinutes(15))) {
-                $this->failure($row, 'Original nicht in „Gesendete Elemente" gefunden', giveUp: true);
+                // Diagnose: Liegt die Mail unter anderer Message-ID doch in
+                // „Gesendet" (dann nur nicht ersetzbar, aber vorhanden) — oder
+                // fehlt sie dort ganz (Client/Exchange hat die Kopie nicht
+                // abgelegt)? Macht den Protokolleintrag aussagekräftig.
+                $subject = (string) Message::from($row->rawMail(), false)->getSubject();
+                $reason = $graph->sentItemExistsBySubject($row->sender, $subject)
+                    ? 'Kopie in „Gesendete Elemente" vorhanden, aber unter anderer Message-ID — nicht durch signierte Fassung ersetzt'
+                    : 'Keine Kopie in „Gesendete Elemente" — dort fehlt die Mail (Client/Exchange hat sie nicht abgelegt)';
+                $this->failure($row, $reason, giveUp: true, subject: $subject);
             }
 
             return false;
@@ -82,7 +90,7 @@ class UpdateSentItems extends Command
                 continue;
             }
             if (strlen($content) > self::MAX_ATTACHMENT) {
-                $this->failure($row, 'Anhang größer 3 MB — Aktualisierung übersprungen', giveUp: true);
+                $this->failure($row, 'Anhang größer 3 MB — Aktualisierung übersprungen', giveUp: true, subject: (string) $msg->getSubject());
 
                 return false;
             }
@@ -133,7 +141,7 @@ class UpdateSentItems extends Command
         return true;
     }
 
-    protected function failure(SentItemsUpdate $row, string $reason, bool $giveUp = false): void
+    protected function failure(SentItemsUpdate $row, string $reason, bool $giveUp = false, ?string $subject = null): void
     {
         $row->attempts++;
         $row->last_error = mb_substr($reason, 0, 1000);
@@ -141,10 +149,11 @@ class UpdateSentItems extends Command
 
         if ($giveUp || $row->attempts >= self::MAX_ATTEMPTS) {
             Log::warning("mail:update-sent-items: Auftrag {$row->id} ({$row->sender}) aufgegeben: {$reason}");
-            AuditEvent::log('sent_items_failed', details: [
+            AuditEvent::log('sent_items_failed', details: array_filter([
                 'sender' => $row->sender,
+                'subject' => $subject !== null ? mb_substr($subject, 0, 200) : null,
                 'reason' => mb_substr($reason, 0, 500),
-            ]);
+            ], fn ($v) => $v !== null));
             $row->cleanup();
         }
     }
