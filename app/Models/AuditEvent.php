@@ -33,6 +33,7 @@ class AuditEvent extends Model
         'recipient_notified' => 'ausgehend',
         'password_sent' => 'ausgehend',
         'reminder_sent' => 'ausgehend',
+        'reminder_final_sent' => 'ausgehend',
         'unlocked' => 'Portal',
         'unlock_failed' => 'Portal',
         'downloaded' => 'Portal',

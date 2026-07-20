@@ -15,6 +15,7 @@ class ReminderMail extends Mailable
     public function __construct(
         public SecureMessage $msg,
         public MessageRecipient $recipient,
+        public bool $final = false,
     ) {}
 
     public function headers(): Headers
@@ -29,7 +30,9 @@ class ReminderMail extends Mailable
         return new Envelope(
             from: new Address($this->msg->sender_email, $name),
             replyTo: [new Address($this->msg->sender_email)],
-            subject: 'Erinnerung: Sichere Nachricht wartet auf Abruf',
+            subject: $this->final
+                ? 'Letzte Erinnerung: Sichere Nachricht wird bald gelöscht'
+                : 'Erinnerung: Sichere Nachricht wartet auf Abruf',
         );
     }
 
@@ -43,6 +46,7 @@ class ReminderMail extends Mailable
                 'senderName' => $this->msg->sender_name ?: $this->msg->sender_email,
                 'senderEmail' => $this->msg->sender_email,
                 'expiresAt' => $this->msg->expires_at,
+                'final' => $this->final,
             ],
         );
     }

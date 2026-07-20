@@ -1,4 +1,8 @@
 Guten Tag,
+@if (($final ?? false))
+
+LETZTE ERINNERUNG: Diese Nachricht wird am {{ $expiresAt->format('d.m.Y') }} automatisch und unwiderruflich gelöscht. Bitte rufen Sie sie vorher ab.
+@endif
 
 eine vertrauliche Nachricht von {{ $senderName }} ({{ $senderEmail }}) wartet noch auf Ihren Abruf.
 

@@ -62,6 +62,12 @@
                     @error('reminder_after_hours')<div class="error">{{ $message }}</div>@enderror
                     <p class="muted" style="margin-top:6px;">Ruft ein Empfänger seine Nachricht nach dieser Zeit noch nicht ab, erhält er automatisch eine Erinnerung (0 = keine automatische Erinnerung). Manuell lässt sich jederzeit über die Nachrichten-Liste erinnern.</p>
                 </div>
+                <div>
+                    <label>Letzte Erinnerung vor Löschung (Stunden)</label>
+                    <input type="text" wire:model="reminder_before_expiry_hours" style="max-width:120px;">
+                    @error('reminder_before_expiry_hours')<div class="error">{{ $message }}</div>@enderror
+                    <p class="muted" style="margin-top:6px;">Zusätzliche letzte Erinnerung, wenn eine noch nicht abgerufene Nachricht in dieser Zeit automatisch gelöscht wird (0 = aus). Wird unabhängig von der Erinnerung oben genau einmal versendet — auch wenn diese schon verschickt wurde.</p>
+                </div>
             </div>
         </div>
 

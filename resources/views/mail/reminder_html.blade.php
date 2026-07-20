@@ -4,6 +4,11 @@
     </div>
     <div style="border:1px solid #e5e7eb;border-top:0;border-radius:0 0 10px 10px;padding:24px;">
         <p>Guten Tag,</p>
+        @if (($final ?? false))
+            <p style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;color:#991b1b;">
+                <strong>Letzte Erinnerung:</strong> Diese Nachricht wird am <strong>{{ $expiresAt->format('d.m.Y') }}</strong> automatisch und unwiderruflich gelöscht. Bitte rufen Sie sie vorher ab.
+            </p>
+        @endif
         <p>eine vertrauliche Nachricht von <strong>{{ $senderName }}</strong> ({{ $senderEmail }}) wartet noch auf Ihren Abruf.</p>
         <p style="text-align:center;margin:28px 0;">
             <a href="{{ $url }}" style="background:#1d4e89;color:#ffffff;text-decoration:none;padding:13px 28px;border-radius:8px;font-weight:bold;display:inline-block;">Nachricht abrufen</a>

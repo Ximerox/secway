@@ -24,6 +24,8 @@ class Settings extends Component
 
     public int $reminder_after_hours = 0;
 
+    public int $reminder_before_expiry_hours = 0;
+
     public bool $reply_enabled = false;
 
     public int $reply_max_size_mb = 20;
@@ -52,6 +54,7 @@ class Settings extends Component
         $this->retention_days = (int) Setting::get('retention_days', config('mailgateway.retention_days'));
         $this->password_delay_minutes = (int) Setting::get('password_delay_minutes', config('mailgateway.password_delay_minutes'));
         $this->reminder_after_hours = (int) Setting::get('reminder_after_hours', config('mailgateway.reminder_after_hours'));
+        $this->reminder_before_expiry_hours = (int) Setting::get('reminder_before_expiry_hours', config('mailgateway.reminder_before_expiry_hours'));
         $this->reply_enabled = Setting::getBool('reply_enabled', (bool) config('mailgateway.reply_enabled'));
         $this->reply_max_size_mb = (int) Setting::get('reply_max_size_mb', config('mailgateway.reply_max_size_mb'));
         $this->reply_max_per_message = (int) Setting::get('reply_max_per_message', config('mailgateway.reply_max_per_message'));
@@ -71,6 +74,7 @@ class Settings extends Component
             'retention_days' => 'required|integer|min:1|max:365',
             'password_delay_minutes' => 'required|integer|min:0|max:60',
             'reminder_after_hours' => 'required|integer|min:0|max:2160',
+            'reminder_before_expiry_hours' => 'required|integer|min:0|max:2160',
             'reply_max_size_mb' => 'required|integer|min:1|max:50',
             'reply_max_per_message' => 'required|integer|min:1|max:50',
             'inbound_hold_hours' => 'required|integer|min:1|max:720',
@@ -94,6 +98,7 @@ class Settings extends Component
         Setting::set('retention_days', $this->retention_days);
         Setting::set('password_delay_minutes', $this->password_delay_minutes);
         Setting::set('reminder_after_hours', $this->reminder_after_hours);
+        Setting::set('reminder_before_expiry_hours', $this->reminder_before_expiry_hours);
         Setting::set('reply_enabled', $this->reply_enabled);
         Setting::set('reply_max_size_mb', $this->reply_max_size_mb);
         Setting::set('reply_max_per_message', $this->reply_max_per_message);
@@ -112,6 +117,7 @@ class Settings extends Component
             'retention_days' => $this->retention_days,
             'password_delay_minutes' => $this->password_delay_minutes,
             'reminder_after_hours' => $this->reminder_after_hours,
+            'reminder_before_expiry_hours' => $this->reminder_before_expiry_hours,
             'reply_enabled' => $this->reply_enabled,
             'reply_max_size_mb' => $this->reply_max_size_mb,
             'reply_max_per_message' => $this->reply_max_per_message,
