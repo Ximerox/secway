@@ -205,5 +205,13 @@ class AuditEvent extends Model
             'details' => $details,
             'created_at' => now(),
         ]);
+
+        // Fehlgeschlagene Anmeldungen zusätzlich ins Syslog (journald), damit
+        // CrowdSec/Wazuh sie mit IP sehen; die Datenbank sieht nur die App selbst.
+        if (in_array($event, ['unlock_failed', 'admin_login_failed'], true)) {
+            openlog('secway', LOG_PID, LOG_AUTH);
+            syslog(LOG_WARNING, sprintf('auth_failed event=%s ip=%s', $event, $ip ?? '-'));
+            closelog();
+        }
     }
 }
