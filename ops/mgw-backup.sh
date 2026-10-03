@@ -25,7 +25,6 @@ BACKUP_PATHS=(
     /etc/nginx/sites-available
     /etc/letsencrypt
     /etc/cron.d
-    /etc/fail2ban
     /usr/local/sbin/mgw-backup.sh
     /usr/local/sbin/mgw-health.sh
     /usr/local/sbin/mgw-queue-helper.sh
@@ -35,6 +34,10 @@ BACKUP_PATHS=(
 # Optional: Das Verzeichnis entsteht erst mit dem ersten Bild-Upload.
 [ -d "$APP_DIR/storage/app/private/signatures" ] \
     && BACKUP_PATHS+=("$APP_DIR/storage/app/private/signatures")
+# fail2ban, optional (kann durch CrowdSec ersetzt sein)
+[ -d /etc/fail2ban ] && BACKUP_PATHS+=(/etc/fail2ban)
+# Eigene CrowdSec-Erkennung (Quellen, Parser, Szenarien), optional; ohne Zugangsdaten
+[ -d /etc/crowdsec ] && BACKUP_PATHS+=(/etc/crowdsec/acquis.d /etc/crowdsec/parsers /etc/crowdsec/scenarios)
 # Quarantäne (zurückgehaltene eingehende S/MIME-Mails), optional
 [ -d "$APP_DIR/storage/app/held" ] \
     && BACKUP_PATHS+=("$APP_DIR/storage/app/held")

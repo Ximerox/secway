@@ -9,7 +9,12 @@ HOST=$(hostname -f)
 ISSUES=""
 
 # 1) Dienste
-for s in postfix nginx "$PHP_FPM_SERVICE" mariadb fail2ban; do
+SERVICES=(postfix nginx "$PHP_FPM_SERVICE" mariadb)
+# Angriffsabwehr ist optional (fail2ban oder CrowdSec): nur pruefen, was installiert ist
+for s in fail2ban crowdsec; do
+    systemctl list-unit-files "$s.service" >/dev/null 2>&1 && SERVICES+=("$s")
+done
+for s in "${SERVICES[@]}"; do
     systemctl is-active --quiet "$s" || ISSUES+="Dienst '$s' ist nicht aktiv!"$'\n'
 done
 
