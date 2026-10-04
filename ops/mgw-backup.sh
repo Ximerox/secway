@@ -23,6 +23,8 @@ BACKUP_PATHS=(
     /etc/secway.conf
     /etc/postfix
     /etc/nginx/sites-available
+    /etc/nginx/sites-enabled
+    /etc/nginx/snippets
     /etc/letsencrypt
     /etc/cron.d
     /usr/local/sbin/mgw-backup.sh
@@ -36,6 +38,9 @@ BACKUP_PATHS=(
     && BACKUP_PATHS+=("$APP_DIR/storage/app/private/signatures")
 # fail2ban, optional (kann durch CrowdSec ersetzt sein)
 [ -d /etc/fail2ban ] && BACKUP_PATHS+=(/etc/fail2ban)
+# str-ca-Client (Konfiguration + Provisioner-Kennwort), optional; Zertifikat
+# selbst laesst sich danach mit "str-ca-client --force" neu holen
+[ -d /etc/str-ca ] && BACKUP_PATHS+=(/etc/str-ca)
 # Eigene CrowdSec-Erkennung (Quellen, Parser, Szenarien), optional; ohne Zugangsdaten
 [ -d /etc/crowdsec ] && BACKUP_PATHS+=(/etc/crowdsec/acquis.d /etc/crowdsec/parsers /etc/crowdsec/scenarios)
 # Quarantäne (zurückgehaltene eingehende S/MIME-Mails), optional

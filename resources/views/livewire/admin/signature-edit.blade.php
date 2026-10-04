@@ -164,11 +164,11 @@
                     <tbody>
                     @foreach ($images as $img)
                         <tr>
-                            <td><img src="{{ route('admin.sigimg', $img) }}" alt="" style="max-height:40px; max-width:160px;"></td>
+                            <td><img src="{{ route('admin.sigimg', $img, absolute: false) }}" alt="" style="max-height:40px; max-width:160px;"></td>
                             <td class="muted">{{ $img->original_name }}</td>
                             <td class="muted">{{ number_format($img->size / 1024, 0, ',', '.') }} KB</td>
                             <td style="text-align:right; white-space:nowrap;">
-                                <button type="button" class="btn small ghost" onclick="sigInsertImage('{{ route('admin.sigimg', $img) }}')">In Editor einfügen</button>
+                                <button type="button" class="btn small ghost" onclick="sigInsertImage('{{ route('admin.sigimg', $img, absolute: false) }}')">In Editor einfügen</button>
                                 <button class="btn small danger" wire:click="deleteImage({{ $img->id }})" wire:confirm="Bild „{{ $img->original_name }}" löschen?">Löschen</button>
                             </td>
                         </tr>
@@ -215,11 +215,11 @@
                     <tbody>
                     @foreach ($qrCodes as $qr)
                         <tr>
-                            <td><img src="{{ route('admin.sigqr', $qr) }}" alt="" style="height:44px; width:44px;"></td>
+                            <td><img src="{{ route('admin.sigqr', $qr, absolute: false) }}" alt="" style="height:44px; width:44px;"></td>
                             <td><strong>{{ $qr->label }}</strong></td>
                             <td class="muted">{{ $qr->size }} px</td>
                             <td style="text-align:right; white-space:nowrap;">
-                                <button type="button" class="btn small ghost" onclick="sigInsertImage('{{ route('admin.sigqr', $qr) }}')">In Editor einfügen</button>
+                                <button type="button" class="btn small ghost" onclick="sigInsertImage('{{ route('admin.sigqr', $qr, absolute: false) }}')">In Editor einfügen</button>
                                 <button type="button" class="btn small ghost" wire:click="editQr({{ $qr->id }})">Bearbeiten</button>
                                 <button class="btn small danger" wire:click="deleteQr({{ $qr->id }})" wire:confirm="QR-Code „{{ $qr->label }}" löschen?">Löschen</button>
                             </td>

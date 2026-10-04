@@ -146,7 +146,9 @@
         <div class="menu">
             <a href="{{ route('admin.queue') }}" @class(['active' => request()->routeIs('admin.queue')])>Warteschlange</a>
             <a href="{{ route('admin.settings') }}" @class(['active' => request()->routeIs('admin.settings')])>Einstellungen</a>
-            <a href="{{ route('admin.account') }}" @class(['active' => request()->routeIs('admin.account')])>Konto</a>
+            @if (Route::has('admin.account'))
+                <a href="{{ route('admin.account') }}" @class(['active' => request()->routeIs('admin.account')])>Konto</a>
+            @endif
         </div>
     </div>
     <form method="post" action="{{ route('admin.logout') }}">

@@ -61,6 +61,23 @@ return [
         'client_secret' => env('GRAPH_CLIENT_SECRET'),
     ],
 
+    // Basis-URL der Verwaltung für Links in Hinweis-Mails (z. B. interner
+    // Hostname, wenn /admin nur intern ausgeliefert wird). Leer = APP_URL.
+    'admin_url' => env('MGW_ADMIN_URL') ?: env('APP_URL'),
+
+    // Anmeldung an der Verwaltung per Entra ID (OIDC, Authorization Code + PKCE).
+    // Bewusst eine eigene App-Registrierung, getrennt von der Graph-App oben:
+    // diese braucht nur delegierte Rechte (openid profile email) und eine
+    // App-Rolle. Redirect-URI: <Verwaltungs-URL>/admin/auth/callback.
+    // Sind alle drei Werte gesetzt, ist die lokale Kennwort-Anmeldung abgeschaltet.
+    'entra_login' => [
+        'tenant_id' => env('ENTRA_LOGIN_TENANT_ID'),
+        'client_id' => env('ENTRA_LOGIN_CLIENT_ID'),
+        'client_secret' => env('ENTRA_LOGIN_CLIENT_SECRET'),
+        // App-Rolle(n), von denen der Benutzer mindestens eine haben muss
+        'allowed_roles' => array_filter(array_map('trim', explode(',', env('ENTRA_LOGIN_ROLES', 'SecWay.Admin')))),
+    ],
+
     // PHP-CLI-Binary für isolierte Subprozesse (QR-Code-Erzeugung). In FPM ist
     // PHP_BINARY = php-fpm und damit ungeeignet, daher separat konfigurierbar.
     'php_binary' => env('MGW_PHP_BINARY', '/usr/bin/php'),

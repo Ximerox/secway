@@ -1,0 +1,56 @@
+# Optional: Verwaltung (/admin) nur unter einem internen Hostnamen ausliefern.
+# Der öffentliche vhost liefert Portal, Add-ins und APIs; /admin und die
+# Livewire-Endpunkte gibt es dort nicht (siehe unten). Zertifikat aus der
+# internen CA (bei St. Raphael: str-ca, erneuert per str-ca-client-Timer).
+#
+# 1. Datei nach /etc/nginx/sites-available/secway-intern, Namen/Pfade anpassen,
+#    ln -s ../sites-available/secway-intern /etc/nginx/sites-enabled/
+# 2. Im öffentlichen vhost (443-Block) VOR "location /" ergänzen:
+#        location ^~ /admin      { return 404; }
+#        location ^~ /livewire-  { return 404; }
+# 3. .env: MGW_ADMIN_URL=https://secway.intern.example
+#    (bei Entra-SSO Redirect-URI https://secway.intern.example/admin/auth/callback)
+# 4. nginx -t && systemctl reload nginx; php artisan config:cache
+
+server {
+    listen 80;
+    server_name secway.intern.example;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name secway.intern.example;
+
+    ssl_certificate     /etc/ssl/str-ca/secway.crt;
+    ssl_certificate_key /etc/ssl/str-ca/secway.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Nur interne Netze
+    allow 10.0.0.0/8;
+    allow 192.168.0.0/16;
+    deny all;
+
+    root /var/www/secway/public;
+    index index.php;
+    client_max_body_size 60M;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+
+    location = / { return 302 /admin; }
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+    }
+
+    location ~ /\.(?!well-known).* { deny all; }
+}

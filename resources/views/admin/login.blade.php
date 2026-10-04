@@ -19,7 +19,9 @@
     input:focus { outline: 2px solid #1d4e89; border-color: #1d4e89; }
     button { width: 100%; margin-top: 18px; padding: 11px; font-size: 15px; font-weight: 600; color: #fff;
              background: #1d4e89; border: 0; border-radius: 8px; cursor: pointer; }
-    button:hover { background: #163d6d; }
+    button:hover, a.btn:hover { background: #163d6d; }
+    a.btn { display: block; text-align: center; text-decoration: none; padding: 11px; font-size: 15px; font-weight: 600;
+            color: #fff; background: #1d4e89; border-radius: 8px; }
     .alert { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 8px;
              padding: 9px 13px; margin-bottom: 12px; font-size: 14px; }
 </style>
@@ -38,14 +40,18 @@
     @if ($errors->any())
         <div class="alert">{{ $errors->first() }}</div>
     @endif
-    <form method="post" action="{{ route('login') }}">
-        @csrf
-        <label for="username">Benutzername</label>
-        <input type="text" id="username" name="username" value="{{ old('username') }}" required autofocus autocomplete="username">
-        <label for="password">Kennwort</label>
-        <input type="password" id="password" name="password" required autocomplete="current-password">
-        <button type="submit">Anmelden</button>
-    </form>
+    @if ($entra)
+        <a class="btn" href="{{ route('admin.entra') }}">Mit Microsoft anmelden</a>
+    @else
+        <form method="post" action="{{ route('login') }}">
+            @csrf
+            <label for="username">Benutzername</label>
+            <input type="text" id="username" name="username" value="{{ old('username') }}" required autofocus autocomplete="username">
+            <label for="password">Kennwort</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password">
+            <button type="submit">Anmelden</button>
+        </form>
+    @endif
 </div>
 </body>
 </html>

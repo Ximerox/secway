@@ -32,7 +32,7 @@ class HeldMailNotification extends Mailable
             text: 'mail.held_text',
             with: [
                 'held' => $this->held,
-                'url' => url('/admin/zurueckgehalten'),
+                'url' => rtrim((string) config('mailgateway.admin_url'), '/').'/admin/zurueckgehalten',
             ],
         );
     }

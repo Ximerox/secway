@@ -48,6 +48,8 @@ Route::prefix('admin')->group(function () {
     Route::get('login', [AdminAuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AdminAuthController::class, 'login'])->middleware('throttle:10,1');
     Route::post('logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
+    Route::get('auth/entra', [AdminAuthController::class, 'entraRedirect'])->name('admin.entra')->middleware('throttle:20,1');
+    Route::get('auth/callback', [AdminAuthController::class, 'entraCallback'])->name('admin.entra.callback')->middleware('throttle:20,1');
 
     Route::middleware('auth')->group(function () {
         // Übersicht ist in Statistik + Protokoll aufgegangen; Routenname bleibt
@@ -67,6 +69,10 @@ Route::prefix('admin')->group(function () {
         Route::get('/benutzer', EntraUsers::class)->name('admin.users');
         Route::get('/einstellungen', Settings::class)->name('admin.settings');
         Route::get('/sicher-versenden', SendRules::class)->name('admin.sendrules');
-        Route::get('/konto', Account::class)->name('admin.account');
+        // Konto (Benutzername/Kennwort) nur bei lokaler Anmeldung; mit Entra-SSO
+        // gibt es kein lokales Kennwort mehr.
+        if (! AdminAuthController::entraEnabled()) {
+            Route::get('/konto', Account::class)->name('admin.account');
+        }
     });
 });
