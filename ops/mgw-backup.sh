@@ -4,6 +4,9 @@
 # WICHTIG: Das Backup-Verzeichnis sollte zusaetzlich extern gesichert werden.
 # Konfiguration: /etc/secway.conf (Vorlage: ops/secway.conf.example)
 
+# Cron startet mit PATH=/usr/bin:/bin; postqueue/postsuper liegen in /usr/sbin
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 set -u
 . /etc/secway.conf || exit 1
 DATE=$(date +%F)
@@ -36,8 +39,6 @@ BACKUP_PATHS=(
 # Optional: Das Verzeichnis entsteht erst mit dem ersten Bild-Upload.
 [ -d "$APP_DIR/storage/app/private/signatures" ] \
     && BACKUP_PATHS+=("$APP_DIR/storage/app/private/signatures")
-# fail2ban, optional (kann durch CrowdSec ersetzt sein)
-[ -d /etc/fail2ban ] && BACKUP_PATHS+=(/etc/fail2ban)
 # str-ca-Client (Konfiguration + Provisioner-Kennwort), optional; Zertifikat
 # selbst laesst sich danach mit "str-ca-client --force" neu holen
 [ -d /etc/str-ca ] && BACKUP_PATHS+=(/etc/str-ca)

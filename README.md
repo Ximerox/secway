@@ -76,7 +76,7 @@ S/MIME **signing** above.
 - **Admin UI** (German) — statistics dashboard, message list with remind/delete, live Postfix
   queue view with re-deliver/delete, structured audit log grouped per mail, all settings editable
 - **Operations built in** — health monitoring with alerting and mail-loop emergency brake,
-  nightly backups (restore-tested), fail2ban integration, GDPR pages maintainable in the admin UI
+  nightly backups (restore-tested), CrowdSec integration, GDPR pages maintainable in the admin UI
 - **Fail-safe by design** — if encryption fails (e.g. expired certificate), the message goes
   to the portal instead of leaving in plaintext; missing auth header defers (TEMPFAIL) instead
   of dropping mail; everything the gateway sends is loop-protected via `X-MGW-Notification`
@@ -127,7 +127,7 @@ and off by default.
 ## Installation
 
 See **[docs/INSTALL.md](docs/INSTALL.md)** for the full walkthrough (packages, database, nginx,
-Postfix content filter, mail-system connectors, cron, fail2ban, first login).
+Postfix content filter, mail-system connectors, cron, CrowdSec, first login).
 
 German operations manual: **[docs/OPERATIONS.de.md](docs/OPERATIONS.de.md)**.
 

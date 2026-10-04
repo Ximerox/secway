@@ -22,7 +22,7 @@ Throughout this guide the app lives in `/var/www/secway` and the portal is reach
 
 ```bash
 apt install nginx php8.4-fpm php8.4-{mysql,mbstring,xml,curl,zip,intl,gd,bcmath} \
-    mariadb-server composer certbot python3-certbot-nginx postfix git fail2ban \
+    mariadb-server composer certbot python3-certbot-nginx postfix git \
     unattended-upgrades swaks curl
 ```
 
@@ -295,10 +295,25 @@ Entra sync and the per-minute Sent-Items updater when enabled), a 5-minute healt
 mail alerting and a mail-loop emergency brake, nightly backups and the privileged helper that
 executes queue deletions requested from the admin UI.
 
-## 9. fail2ban
+## 9. Attack detection (CrowdSec)
 
-Enable the shipped `sshd` and `postfix` jails with the systemd/journald backend in
-`/etc/fail2ban/jail.local`.
+SecWay writes failed portal unlocks and admin logins to syslog (ident `secway`,
+`auth_failed event=… ip=…`). Install the CrowdSec agent (packages from packagecloud, see
+crowdsec.net), run `cscli setup` (detects nginx, Postfix, sshd), then add the SecWay pieces
+from `deploy/crowdsec/`:
+
+```bash
+cp deploy/crowdsec/secway.yaml                  /etc/crowdsec/acquis.d/
+cp deploy/crowdsec/straphael-secway-logs.yaml   /etc/crowdsec/parsers/s01-parse/
+cp deploy/crowdsec/straphael-secway-bf.yaml     /etc/crowdsec/scenarios/
+cp deploy/crowdsec/straphael-exo-whitelist.yaml /etc/crowdsec/parsers/s02-enrich/
+systemctl reload crowdsec
+```
+
+The Exchange Online whitelist is essential: a ban on an EOP address stops all mail flow.
+Keep it in sync with Microsoft's endpoint list (ID 10). Enforcement happens in a bouncer
+(firewall in front of the gateway or `crowdsec-firewall-bouncer` locally); the health check
+monitors the `crowdsec` service when it is installed.
 
 ## 10. Certificates
 

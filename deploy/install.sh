@@ -48,7 +48,7 @@ echo "== Pakete installieren =="
 apt-get update -qq
 apt-get install -y nginx php8.4-fpm php8.4-mysql php8.4-mbstring php8.4-xml \
   php8.4-curl php8.4-zip php8.4-intl php8.4-gd php8.4-bcmath \
-  mariadb-server composer certbot python3-certbot-nginx postfix git fail2ban \
+  mariadb-server composer certbot python3-certbot-nginx postfix git \
   unattended-upgrades swaks curl
 
 # --- 3. Datenbank -----------------------------------------------------------
@@ -120,6 +120,6 @@ cat <<DONE
    * Exchange Online: In-/Outbound-Connector + Transportregel (Abschnitt 6),
      Header X-MGW-Auth = obiger Wert
    * Optional Signaturblock-Modul: Entra-App + GRAPH_* in .env (Abschnitt 7)
-   * fail2ban-Jails aktivieren (Abschnitt 9)
+   * CrowdSec-Agent + SecWay-Erkennung einrichten (Abschnitt 9)
 ============================================================================
 DONE

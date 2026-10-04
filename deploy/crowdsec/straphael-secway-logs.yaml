@@ -1,0 +1,18 @@
+# SecWay (Mailgateway): fehlgeschlagene Portal-Entsperrung / Admin-Anmeldung.
+# Beispiel (journald, Ident secway): auth_failed event=unlock_failed ip=203.0.113.10
+onsuccess: next_stage
+filter: "evt.Parsed.program == 'secway'"
+name: straphael/secway-logs
+description: "SecWay auth_failed"
+grok:
+  pattern: '^auth_failed event=%{WORD:event} ip=%{IP:source_ip}'
+  apply_on: message
+statics:
+  - meta: log_type
+    value: secway_auth_failed
+  - meta: service
+    value: secway
+  - meta: source_ip
+    expression: evt.Parsed.source_ip
+  - meta: event
+    expression: evt.Parsed.event

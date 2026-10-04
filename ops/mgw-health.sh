@@ -3,6 +3,9 @@
 # Alarmiert per Mail bei Problemen; alarmiert nur erneut, wenn sich die Lage aendert.
 # Konfiguration: /etc/secway.conf (Vorlage: ops/secway.conf.example)
 
+# Cron startet mit PATH=/usr/bin:/bin; postqueue/postsuper liegen in /usr/sbin
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 . /etc/secway.conf || exit 1
 STATE=/var/lib/mgw-health.state
 HOST=$(hostname -f)
@@ -10,10 +13,8 @@ ISSUES=""
 
 # 1) Dienste
 SERVICES=(postfix nginx "$PHP_FPM_SERVICE" mariadb)
-# Angriffsabwehr ist optional (fail2ban oder CrowdSec): nur pruefen, was installiert ist
-for s in fail2ban crowdsec; do
-    systemctl list-unit-files "$s.service" >/dev/null 2>&1 && SERVICES+=("$s")
-done
+# CrowdSec ist optional: nur pruefen, wenn installiert
+systemctl list-unit-files crowdsec.service >/dev/null 2>&1 && SERVICES+=(crowdsec)
 for s in "${SERVICES[@]}"; do
     systemctl is-active --quiet "$s" || ISSUES+="Dienst '$s' ist nicht aktiv!"$'\n'
 done

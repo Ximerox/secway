@@ -49,7 +49,7 @@ länger dauert und Mails sofort raus müssen:
 
 **Was gesichert wird** (nächtlich nach `BACKUP_DIR`, Standard 14 Tage): Datenbank-Dump
 (inkl. aller Zertifikate und Schlüssel), `.env` (**enthält den `APP_KEY` — ohne ihn sind alle
-verschlüsselten Daten unwiederbringlich verloren!**), Postfix-/nginx-/Let's-Encrypt-/fail2ban-
+verschlüsselten Daten unwiederbringlich verloren!**), Postfix-/nginx-/Let's-Encrypt-/CrowdSec-/str-ca-
 Konfiguration, Cron-Dateien, Betriebsskripte, verschlüsselte Portal-Nachrichten.
 
 > Das Backup-Verzeichnis zusätzlich **extern** sichern (NAS, zweiter Server) — sonst stirbt

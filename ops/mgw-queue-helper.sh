@@ -4,6 +4,9 @@
 # validierte Queue-IDs in die Request-Datei, die hier erneut geprueft werden.
 # Konfiguration: /etc/secway.conf (Vorlage: ops/secway.conf.example)
 
+# Cron startet mit PATH=/usr/bin:/bin; postqueue/postsuper liegen in /usr/sbin
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 . /etc/secway.conf || exit 1
 REQ="$APP_DIR/storage/app/queue-delete.req"
 [ -s "$REQ" ] || exit 0
