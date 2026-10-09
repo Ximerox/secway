@@ -18,6 +18,8 @@ class Settings extends Component
 
     public bool $smime_sign = true;
 
+    public bool $smime_sign_plain = false;
+
     public int $retention_days = 30;
 
     public int $password_delay_minutes = 2;
@@ -51,6 +53,7 @@ class Settings extends Component
         $this->subject_tag = (string) Setting::get('subject_tag', config('mailgateway.subject_tag'));
         $this->smime_auto = Setting::getBool('smime_auto', true);
         $this->smime_sign = Setting::getBool('smime_sign', true);
+        $this->smime_sign_plain = Setting::getBool('smime_sign_plain', false);
         $this->retention_days = (int) Setting::get('retention_days', config('mailgateway.retention_days'));
         $this->password_delay_minutes = (int) Setting::get('password_delay_minutes', config('mailgateway.password_delay_minutes'));
         $this->reminder_after_hours = (int) Setting::get('reminder_after_hours', config('mailgateway.reminder_after_hours'));
@@ -95,6 +98,7 @@ class Settings extends Component
         Setting::set('subject_tag', trim($this->subject_tag));
         Setting::set('smime_auto', $this->smime_auto);
         Setting::set('smime_sign', $this->smime_sign);
+        Setting::set('smime_sign_plain', $this->smime_sign_plain);
         Setting::set('retention_days', $this->retention_days);
         Setting::set('password_delay_minutes', $this->password_delay_minutes);
         Setting::set('reminder_after_hours', $this->reminder_after_hours);
@@ -114,6 +118,7 @@ class Settings extends Component
             'subject_tag' => trim($this->subject_tag),
             'smime_auto' => $this->smime_auto,
             'smime_sign' => $this->smime_sign,
+            'smime_sign_plain' => $this->smime_sign_plain,
             'retention_days' => $this->retention_days,
             'password_delay_minutes' => $this->password_delay_minutes,
             'reminder_after_hours' => $this->reminder_after_hours,

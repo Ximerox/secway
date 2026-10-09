@@ -360,6 +360,25 @@ class MailIngest extends Command
             ]);
         }
 
+        // Optional: unverschlüsselte Mail an externe Empfänger signieren, wenn der
+        // Absender ein eigenes Zertifikat hat. Jede Störung → unsigniert wie bisher.
+        $signedRcpts = [];
+        $passExternal = array_values(array_filter($passRcpts, fn ($r) => ! InternalDomains::isInternal($r)));
+        if ($passExternal !== [] && ! $isSmime && Setting::getBool('smime_sign_plain', false)) {
+            try {
+                if (app(SmimeMailService::class)->signAndPassThrough($raw, $sender, $passExternal, $parsed)) {
+                    $signedRcpts = $passExternal;
+                    AuditEvent::log('passed_through', details: array_merge([
+                        'queue_id' => $queueId, 'sender' => $sender, 'recipients' => $signedRcpts,
+                        'subject' => mb_substr((string) $parsed->getSubject(), 0, 200), 'signed' => true,
+                    ], $reviewScore !== null ? ['ki_score' => $reviewScore] : []));
+                }
+            } catch (Throwable $e) {
+                Log::warning("mail:ingest {$queueId}: Signieren übersprungen, unsigniert versendet: ".$e->getMessage());
+            }
+        }
+        $passRcpts = array_values(array_diff($passRcpts, $signedRcpts));
+
         if ($passRcpts !== []) {
             app(SmimeMailService::class)->passThrough($raw, $sender, $passRcpts);
             AuditEvent::log('passed_through', details: array_merge([

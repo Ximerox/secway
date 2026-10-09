@@ -49,29 +49,7 @@ class SmimeMailService
         // 2) Signieren (abschaltbar), falls der Absender ein Adress-Zertifikat mit Schlüssel hat
         $signCert = Setting::getBool('smime_sign', true) ? SmimeCertificate::ownForAddress($sender) : null;
         if ($signCert) {
-            $blocks = $this->pemBlocks($signCert->cert_pem);
-            $chainFile = null;
-            if (count($blocks) > 1) {
-                // Zwischenzertifikate (CA-Kette) in die Signatur einbetten
-                $chainFile = $tmpDir.'/chain.pem';
-                file_put_contents($chainFile, implode("\n", array_slice($blocks, 1)));
-            }
-            $signed = $tmpDir.'/signed.eml';
-            // pkcs7 statt cms: openssl_cms_sign kann kein multipart/signed (detached)
-            // mit S/MIME-Encoding erzeugen — openssl_pkcs7_sign schon
-            $ok = openssl_pkcs7_sign(
-                $current,
-                $signed,
-                $blocks[0],
-                $signCert->privateKey(),
-                null,
-                PKCS7_DETACHED,
-                $chainFile,
-            );
-            if (! $ok) {
-                throw new RuntimeException('S/MIME-Signatur fehlgeschlagen: '.(openssl_error_string() ?: 'unbekannt'));
-            }
-            $current = $signed;
+            $current = $this->sign($current, $signCert, $tmpDir);
         }
 
         // 3) Verschlüsseln — ein Umschlag für alle Empfänger-Zertifikate
@@ -95,6 +73,82 @@ class SmimeMailService
 
         // 5) Zurück an Postfix (pickup — läuft nicht durch den Content-Filter)
         RawMail::submit($final, $sender, array_keys($recipients));
+    }
+
+    /**
+     * Signiert eine sonst unverschlüsselt ausgehende Mail (multipart/signed,
+     * detached) und reicht sie weiter. false = Absender hat kein eigenes
+     * Zertifikat; Exception = Signieren nicht möglich/gescheitert. In beiden
+     * Fällen leitet der Aufrufer unsigniert durch. Versendet wird hier nur nach
+     * erfolgreicher Signatur (kein Doppelversand).
+     */
+    public function signAndPassThrough(string $raw, string $sender, array $recipients, Message $parsed): bool
+    {
+        $signCert = SmimeCertificate::ownForAddress($sender);
+        if (! $signCert) {
+            return false;
+        }
+        [$headerBlock, $body] = RawMail::split($raw);
+        // Klar signierte Mail muss unterwegs bitgenau bleiben. 8-Bit-Inhalt oder
+        // überlange Zeilen könnte ein MTA umkodieren — dann lieber unsigniert.
+        if (preg_match('/[-ÿ]/', $body) || preg_match('/^.{999,}$/m', $body)) {
+            throw new RuntimeException('nicht signierbar (8-Bit-Inhalt oder überlange Zeilen)');
+        }
+
+        $tmpDir = sys_get_temp_dir().'/mgw-smime-'.bin2hex(random_bytes(8));
+        if (! mkdir($tmpDir, 0700)) {
+            throw new RuntimeException('Temp-Verzeichnis konnte nicht angelegt werden.');
+        }
+        try {
+            $inner = preg_replace('/
+|
+|
+/', "
+", $this->buildInnerEntity($headerBlock, $body));
+            file_put_contents($tmpDir.'/inner.eml', $inner);
+            $signed = file_get_contents($this->sign($tmpDir.'/inner.eml', $signCert, $tmpDir));
+            $final = $this->composeFinal($headerBlock, $signed, $parsed, keepSubject: true);
+            RawMail::submit(preg_replace('/
+|
+|
+/', "
+", $final), $sender, $recipients);
+        } finally {
+            array_map('unlink', glob($tmpDir.'/*') ?: []);
+            @rmdir($tmpDir);
+        }
+
+        return true;
+    }
+
+    /** Signiert die Datei $current (detached) und gibt den Pfad der signierten Fassung zurück. */
+    private function sign(string $current, SmimeCertificate $signCert, string $tmpDir): string
+    {
+        $blocks = $this->pemBlocks($signCert->cert_pem);
+        $chainFile = null;
+        if (count($blocks) > 1) {
+            // Zwischenzertifikate (CA-Kette) in die Signatur einbetten
+            $chainFile = $tmpDir.'/chain.pem';
+            file_put_contents($chainFile, implode("
+", array_slice($blocks, 1)));
+        }
+        $signed = $tmpDir.'/signed.eml';
+        // pkcs7 statt cms: openssl_cms_sign kann kein multipart/signed (detached)
+        // mit S/MIME-Encoding erzeugen — openssl_pkcs7_sign schon
+        $ok = openssl_pkcs7_sign(
+            $current,
+            $signed,
+            $blocks[0],
+            $signCert->privateKey(),
+            null,
+            PKCS7_DETACHED,
+            $chainFile,
+        );
+        if (! $ok) {
+            throw new RuntimeException('S/MIME-Signatur fehlgeschlagen: '.(openssl_error_string() ?: 'unbekannt'));
+        }
+
+        return $signed;
     }
 
     /**
@@ -146,11 +200,11 @@ class SmimeMailService
     }
 
     /** Finale Mail: transportrelevante Original-Header + bereinigter Betreff + CMS-Teil. */
-    private function composeFinal(string $headerBlock, string $cmsOutput, Message $parsed): string
+    private function composeFinal(string $headerBlock, string $cmsOutput, Message $parsed, bool $keepSubject = false): string
     {
         $drop = [
             'content-type', 'content-transfer-encoding', 'content-disposition', 'content-id',
-            'mime-version', 'subject', 'bcc',
+            'mime-version', 'bcc',
             strtolower((string) config('mailgateway.secret_header')),
             'x-mgw-notification',
             'x-mgw-signed', // interner Marker des Compose-Add-ins, nie zum Empfänger
@@ -158,13 +212,16 @@ class SmimeMailService
             'x-mgw-classify-log', // interne Log-ID der Add-in-Klassifizierung, nie zum Empfänger
         ];
         $keep = [];
+        if (! $keepSubject) {
+            $drop[] = 'subject';
+        }
         foreach (RawMail::headerLines($headerBlock) as $line) {
             if (! in_array(RawMail::headerName($line), $drop, true)) {
                 $keep[] = $line;
             }
         }
 
-        $subject = SubjectTag::strip((string) $parsed->getSubject());
+        $subject = $keepSubject ? '' : SubjectTag::strip((string) $parsed->getSubject());
         if ($subject !== '') {
             $keep[] = 'Subject: '.mb_encode_mimeheader($subject, 'UTF-8', 'B', "\n");
         }

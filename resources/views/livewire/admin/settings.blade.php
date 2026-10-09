@@ -24,6 +24,14 @@
                     <span class="muted">Besitzt der Absender ein eigenes Adress-Zertifikat mit privatem Schlüssel, wird die Nachricht innerhalb der Verschlüsselung signiert (Echtheitsnachweis beim Empfänger). Domain-Zertifikate signieren grundsätzlich nicht.</span>
                 </span>
             </label>
+
+            <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;cursor:pointer;margin-top:14px;">
+                <input type="checkbox" wire:model="smime_sign_plain" style="margin-top:3px;">
+                <span>
+                    <strong>Auch unverschlüsselte Mails signieren</strong><br>
+                    <span class="muted">Normale Mails an externe Empfänger werden signiert, wenn der Absender ein eigenes Adress-Zertifikat besitzt. Der Empfänger erhält so das Zertifikat und kann verschlüsselt antworten. Mails mit 8-Bit-Inhalt und jede Störung beim Signieren: Versand unsigniert wie bisher.</span>
+                </span>
+            </label>
         </div>
 
         <div class="card">
