@@ -172,7 +172,7 @@ class SmimeMailService
                 $keep[] = $line;
             }
         }
-        $keep[] = 'X-MGW-Notification: yes';
+        $keep[] = 'X-MGW-Notification: '.config('mailgateway.notification_marker');
 
         // CRLF-normalisiert einspeisen (SMTP-konform; verhindert fehlerhafte
         // Mails, falls der Body gemischte Zeilenenden enthält)
@@ -226,7 +226,7 @@ class SmimeMailService
             $keep[] = 'Subject: '.mb_encode_mimeheader($subject, 'UTF-8', 'B', "\n");
         }
         // Marker: verhindert, dass die EXO-Transportregel diese Mail erneut zum Gateway routet
-        $keep[] = 'X-MGW-Notification: yes';
+        $keep[] = 'X-MGW-Notification: '.config('mailgateway.notification_marker');
 
         return implode("\n", $keep)."\n".$cmsOutput;
     }

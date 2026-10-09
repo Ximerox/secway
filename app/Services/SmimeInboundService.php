@@ -467,7 +467,7 @@ class SmimeInboundService
                 $keep[] = $line;
             }
         }
-        $keep[] = 'X-MGW-Notification: yes';
+        $keep[] = 'X-MGW-Notification: '.config('mailgateway.notification_marker');
         if ($status !== []) {
             $keep[] = 'X-MGW-Status: '.implode(', ', $status);
         }

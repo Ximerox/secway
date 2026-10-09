@@ -27,7 +27,7 @@ class SignatureTestMail extends Mailable
     public function headers(): Headers
     {
         // Marker, damit die EXO-Regel Gateway-eigene Mails nie zurückschickt
-        return new Headers(text: ['X-MGW-Notification' => 'yes']);
+        return new Headers(text: ['X-MGW-Notification' => (string) config('mailgateway.notification_marker')]);
     }
 
     public function envelope(): Envelope

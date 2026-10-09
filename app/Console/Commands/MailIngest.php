@@ -112,8 +112,12 @@ class MailIngest extends Command
 
         $parsed = Message::from($raw, false);
 
-        // Schleifen-Bremse: eigene Benachrichtigungsmails niemals erneut verarbeiten
-        if ($parsed->getHeaderValue('X-MGW-Notification') !== null) {
+        // Schleifen-Bremse: eigene Mails niemals erneut verarbeiten. Nur der
+        // EIGENE Marker zählt — andere Gateways (z. B. Buchhofadmin) setzen denselben
+        // Header mit eigenem Wert; solche Mails sind normale Mails, ihr Marker
+        // wird beim Wiedereinspeisen durch unseren ersetzt.
+        $marker = trim((string) $parsed->getHeaderValue('X-MGW-Notification', ''));
+        if ($marker !== '' && hash_equals((string) config('mailgateway.notification_marker'), $marker)) {
             AuditEvent::log('ingest_loop_dropped', details: ['queue_id' => $queueId, 'sender' => $sender]);
             Log::warning("mail:ingest {$queueId}: eigene Benachrichtigung zurückerhalten (Transportregel prüfen!) — verworfen");
 

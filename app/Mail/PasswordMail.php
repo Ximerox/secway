@@ -13,7 +13,7 @@ class PasswordMail extends Mailable
 {
     public function headers(): Headers
     {
-        return new Headers(text: ['X-MGW-Notification' => 'yes']);
+        return new Headers(text: ['X-MGW-Notification' => (string) config('mailgateway.notification_marker')]);
     }
 
     public function __construct(

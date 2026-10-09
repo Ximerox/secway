@@ -85,6 +85,13 @@ return [
     // Bearer-Token für die Add-in-API /api/classify („Sicher versenden?").
     // Das Outlook-Add-in muss diesen Wert als Authorization: Bearer mitsenden.
     // Erzeugen z. B. mit: openssl rand -hex 32
+    // Schleifen-Marker: Wert des Headers X-MGW-Notification auf allem, was
+    // dieses Gateway versendet/wiedereinspeist. Pro Installation EINDEUTIG
+    // wählen (andere Gateways nutzen denselben Header) und NICHT "yes"
+    // enthalten lassen — die EXO-Regel-Ausnahmen prüfen per Textmuster.
+    // Muss exakt dem Wert in den Ausnahmen der EXO-Transportregeln entsprechen.
+    'notification_marker' => env('MGW_NOTIFICATION_MARKER', 'yes'),
+
     'classify_token' => env('MGW_CLASSIFY_TOKEN'),
 
     // Bearer-Token für das Compose-Add-in „SecWay Signatur" (/api/signature).

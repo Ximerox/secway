@@ -7,6 +7,10 @@
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 . /etc/secway.conf || exit 1
+# Schleifen-Marker der App (X-MGW-Notification), sonst routet EXO die Alarmmail
+# zurück durchs Gateway. Fallback "yes" für Altinstallationen.
+MARKER=$(grep -E '^MGW_NOTIFICATION_MARKER=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' )
+MARKER=${MARKER:-yes}
 STATE=/var/lib/mgw-health.state
 HOST=$(hostname -f)
 ISSUES=""
@@ -55,16 +59,16 @@ if [ -n "$ISSUES" ]; then
     LAST=$(cat "$STATE" 2>/dev/null)
     if [ "$HASH" != "$LAST" ]; then
         printf '%s' "$HASH" > "$STATE"
-        printf 'Subject: [SecWay] Warnung auf %s\nFrom: %s\nTo: %s\n\n%s\nZeitpunkt: %s\n' \
-            "$HOST" "$ALERT_FROM" "$ALERT_TO" "$ISSUES" "$(date '+%d.%m.%Y %H:%M:%S')" \
-            | /usr/sbin/sendmail "$ALERT_TO"
+        printf 'Subject: [SecWay] Warnung auf %s\nFrom: %s\nTo: %s\nX-MGW-Notification: %s\n\n%s\nZeitpunkt: %s\n' \
+            "$HOST" "$ALERT_FROM" "$ALERT_TO" "$MARKER" "$ISSUES" "$(date '+%d.%m.%Y %H:%M:%S')" \
+            | /usr/sbin/sendmail -f "$ALERT_FROM" "$ALERT_TO"
     fi
 else
     # Lage wieder gut: Status zuruecksetzen, einmalig Entwarnung senden
     if [ -f "$STATE" ]; then
         rm -f "$STATE"
-        printf 'Subject: [SecWay] Entwarnung auf %s\nFrom: %s\nTo: %s\n\nAlle Pruefungen wieder OK.\nZeitpunkt: %s\n' \
-            "$HOST" "$ALERT_FROM" "$ALERT_TO" "$(date '+%d.%m.%Y %H:%M:%S')" \
-            | /usr/sbin/sendmail "$ALERT_TO"
+        printf 'Subject: [SecWay] Entwarnung auf %s\nFrom: %s\nTo: %s\nX-MGW-Notification: %s\n\nAlle Pruefungen wieder OK.\nZeitpunkt: %s\n' \
+            "$HOST" "$ALERT_FROM" "$ALERT_TO" "$MARKER" "$(date '+%d.%m.%Y %H:%M:%S')" \
+            | /usr/sbin/sendmail -f "$ALERT_FROM" "$ALERT_TO"
     fi
 fi

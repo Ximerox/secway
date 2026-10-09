@@ -9,6 +9,10 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 set -u
 . /etc/secway.conf || exit 1
+# Schleifen-Marker der App (X-MGW-Notification), sonst routet EXO die Alarmmail
+# zurück durchs Gateway. Fallback "yes" für Altinstallationen.
+MARKER=$(grep -E '^MGW_NOTIFICATION_MARKER=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' )
+MARKER=${MARKER:-yes}
 DATE=$(date +%F)
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
@@ -59,6 +63,6 @@ fi
 find "$BACKUP_DIR" -type f -mtime +"$BACKUP_KEEP_DAYS" -delete
 
 if [ -n "$FAIL" ]; then
-    printf 'Subject: [SecWay] BACKUP-FEHLER\nFrom: %s\nTo: %s\n\n%s\n' "$ALERT_FROM" "$ALERT_TO" "$FAIL" \
-        | /usr/sbin/sendmail "$ALERT_TO"
+    printf 'Subject: [SecWay] BACKUP-FEHLER\nFrom: %s\nTo: %s\nX-MGW-Notification: %s\n\n%s\n' "$ALERT_FROM" "$ALERT_TO" "$MARKER" "$FAIL" \
+        | /usr/sbin/sendmail -f "$ALERT_FROM" "$ALERT_TO"
 fi
