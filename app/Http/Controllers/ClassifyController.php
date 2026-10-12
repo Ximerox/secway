@@ -6,6 +6,7 @@ use App\Models\EntraUser;
 use App\Models\SendClassifyLog;
 use App\Models\Setting;
 use App\Services\SendClassifier;
+use App\Support\AddinAuth;
 use App\Support\SubjectTag;
 use Illuminate\Http\Request;
 
@@ -115,7 +116,6 @@ class ClassifyController extends Controller
 
     private function authorizeToken(Request $request): void
     {
-        $token = (string) config('mailgateway.classify_token');
-        abort_if($token === '' || ! hash_equals($token, (string) $request->bearerToken()), 401, 'Ungültiges Token.');
+        AddinAuth::check($request, 'mailgateway.classify_token', 'classify');
     }
 }

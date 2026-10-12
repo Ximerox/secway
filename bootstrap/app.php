@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/classify',
             'api/classify/*',
             'api/signature',
+            'api/addin/diag',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

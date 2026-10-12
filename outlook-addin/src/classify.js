@@ -12,15 +12,88 @@
  * Ist SecWay nicht erreichbar oder unauffällig, geht die Mail ohne Hinweis
  * hinaus. Dieses Add-in erzwingt nichts — es erinnert nur.
  *
- * Konfiguration: die beiden Werte unten anpassen. TOKEN = MGW_CLASSIFY_TOKEN
- * aus der SecWay-.env (liegt clientseitig; die API liefert nur ein Ja/Nein und
- * protokolliert keine Mailinhalte).
+ * Konfiguration: URL, Client-ID der Add-in-App und Tenant-ID unten anpassen
+ * (docs/ANLEITUNG-ADDIN-SSO.md).
  */
-const SECWAY_URL = "https://mailgateway.straphael.de";
-const SECWAY_TOKEN = "REPLACE-WITH-MGW_CLASSIFY_TOKEN";
+var SECWAY_URL = "https://secway.example.org";
+var ADDIN_CLIENT_ID = "REPLACE-WITH-ADDIN-CLIENT-ID";
+var ADDIN_TENANT_ID = "REPLACE-WITH-TENANT-ID";
+var ADDIN_NAME = "classify";
 // Beim Deploy mit dem aktuellen Betreff-Tag ersetzt; dient als Rückfall,
 // falls der Live-Abruf des Tags scheitert.
 const SECWAY_TAG_FALLBACK = "REPLACE-WITH-SUBJECT-TAG";
+
+/*
+ * Anmeldung per Office-SSO statt festem Token: Outlook holt ein Entra-Token des
+ * angemeldeten Benutzers für die App „SecWay Outlook-Add-ins". Im Code steht
+ * kein Geheimnis. Weg 1: Nested App Authentication (MSAL, msal-browser in der
+ * HTML-Seite). Weg 2 (Rückfall, z. B. JavaScript-only-Laufzeit):
+ * OfficeRuntime.auth.getAccessToken (braucht <WebApplicationInfo> im Manifest).
+ * Im ereignisbasierten Modus sind keine Dialoge möglich, daher Anmelde-/
+ * Zustimmungs-Prompts aus — die Admin-Zustimmung in Entra ist Pflicht.
+ * Ohne Token: Verhalten wie bei nicht erreichbarem SecWay (fail-open).
+ */
+var ADDIN_SCOPE = SECWAY_URL.replace("https://", "api://") + "/" + ADDIN_CLIENT_ID + "/access_as_user";
+
+/* Fehler (ohne Inhalte/Token) an den Server melden — fire-and-forget. */
+function report(stage, err) {
+    try {
+        if (typeof fetch === "undefined") { return; }
+        var diag = {};
+        try { diag = Office.context.diagnostics || {}; } catch (e) {}
+        fetch(SECWAY_URL + "/api/addin/diag", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                addin: ADDIN_NAME, stage: stage,
+                code: err && (err.code || err.name) ? String(err.code || err.name).slice(0, 40) : "",
+                message: err && err.message ? String(err.message).slice(0, 300) : String(err || "").slice(0, 300),
+                host: String(diag.host || "").slice(0, 40), platform: String(diag.platform || "").slice(0, 40),
+                version: String(diag.version || "").slice(0, 40)
+            })
+        }).catch(function () {});
+    } catch (e) {}
+}
+
+/* Token: zuerst NAA, sonst Office-SSO; jeder Fehler => null (und Diagnose). */
+function getToken(done) {
+    getTokenNaa(function (t) {
+        if (t) { done(t); return; }
+        getTokenSso(done);
+    });
+}
+
+var naaPca = null;
+function getTokenNaa(done) {
+    try {
+        var supported = Office.context.requirements && Office.context.requirements.isSetSupported("NestedAppAuth", "1.1");
+        if (!supported || typeof msal === "undefined" || !msal.createNestablePublicClientApplication) {
+            done(null); return;
+        }
+        var ready = naaPca ? Promise.resolve(naaPca) : msal.createNestablePublicClientApplication({
+            auth: { clientId: ADDIN_CLIENT_ID, authority: "https://login.microsoftonline.com/" + ADDIN_TENANT_ID }
+        }).then(function (pca) { naaPca = pca; return pca; });
+        ready
+            .then(function (pca) { return pca.acquireTokenSilent({ scopes: [ADDIN_SCOPE] }); })
+            .then(function (r) { done(r && r.accessToken ? r.accessToken : null); })
+            .catch(function (e) { report("naa", e); done(null); });
+    } catch (e) {
+        report("naa-throw", e); done(null);
+    }
+}
+
+function getTokenSso(done) {
+    try {
+        if (typeof OfficeRuntime === "undefined" || !OfficeRuntime.auth || !OfficeRuntime.auth.getAccessToken) {
+            report("no-getAccessToken", null); done(null); return;
+        }
+        OfficeRuntime.auth.getAccessToken({ allowSignInPrompt: false, allowConsentPrompt: false, forMSGraphAccess: false })
+            .then(function (t) { done(t || null); })
+            .catch(function (e) { report("getAccessToken", e); done(null); });
+    } catch (e) {
+        report("getAccessToken-throw", e); done(null);
+    }
+}
 
 function onMessageSendHandler(event) {
     // Outlook Classic (Windows) führt ereignisbasierte Add-ins in einer
@@ -178,17 +251,23 @@ function gatherRecipients(item, done) {
 /* SecWay fragen; jeder Fehler/Timeout => senden (verdict.ask=false) */
 function classify(payload, done) {
     if (typeof fetch !== "function") { done({ ask: false }); return; } // Classic-Laufzeit
-    const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
-    if (ctrl) setTimeout(function () { ctrl.abort(); }, 6000);
-    fetch(SECWAY_URL + "/api/classify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SECWAY_TOKEN },
-        body: JSON.stringify(payload),
-        signal: ctrl ? ctrl.signal : undefined
-    })
-        .then(function (r) { return r.ok ? r.json() : { ask: false }; })
-        .then(function (j) { done(j); })
-        .catch(function () { done({ ask: false }); });
+    getToken(function (token) {
+        if (!token) { done({ ask: false }); return; }
+        const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+        if (ctrl) setTimeout(function () { ctrl.abort(); }, 6000);
+        fetch(SECWAY_URL + "/api/classify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+            body: JSON.stringify(payload),
+            signal: ctrl ? ctrl.signal : undefined
+        })
+            .then(function (r) {
+                if (!r.ok) { report("api-http", { code: String(r.status), message: "HTTP " + r.status }); return { ask: false }; }
+                return r.json();
+            })
+            .then(function (j) { done(j); })
+            .catch(function () { done({ ask: false }); });
+    });
 }
 
 /* --- Ribbon-Button „Sicher senden" --------------------------------------- *
@@ -226,15 +305,18 @@ function secureSend(event) {
 /* Aktuelles Tag vom Server; bei Fehler der beim Deploy injizierte Rückfall. */
 function fetchTag(done) {
     if (typeof fetch !== "function") { done(SECWAY_TAG_FALLBACK); return; } // Classic-Laufzeit
-    const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
-    if (ctrl) setTimeout(function () { ctrl.abort(); }, 4000);
-    fetch(SECWAY_URL + "/api/subject-tag", {
-        headers: { "Authorization": "Bearer " + SECWAY_TOKEN },
-        signal: ctrl ? ctrl.signal : undefined
-    })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) { done(j && j.tag ? j.tag : SECWAY_TAG_FALLBACK); })
-        .catch(function () { done(SECWAY_TAG_FALLBACK); });
+    getToken(function (token) {
+        if (!token) { done(SECWAY_TAG_FALLBACK); return; }
+        const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+        if (ctrl) setTimeout(function () { ctrl.abort(); }, 4000);
+        fetch(SECWAY_URL + "/api/subject-tag", {
+            headers: { "Authorization": "Bearer " + token },
+            signal: ctrl ? ctrl.signal : undefined
+        })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) { done(j && j.tag ? j.tag : SECWAY_TAG_FALLBACK); })
+            .catch(function () { done(SECWAY_TAG_FALLBACK); });
+    });
 }
 
 /* Info-Leiste im Entwurf (Fallback-Hinweise). */

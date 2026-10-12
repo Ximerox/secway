@@ -6,7 +6,9 @@ use App\Models\EntraUser;
 use App\Models\Setting;
 use App\Models\SignatureTemplate;
 use App\Services\SignatureRenderer;
+use App\Support\AddinAuth;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Stateless-API für das Compose-Add-in „SecWay Signatur": liefert den
@@ -63,7 +65,26 @@ class SignatureController extends Controller
 
     private function authorizeToken(Request $request): void
     {
-        $token = (string) config('mailgateway.signature_token');
-        abort_if($token === '' || ! hash_equals($token, (string) $request->bearerToken()), 401, 'Ungültiges Token.');
+        AddinAuth::check($request, 'mailgateway.signature_token', 'signature');
+    }
+
+    /**
+     * Diagnose-Meldungen der Add-ins (ohne Token/Inhalte). Ungeschützt, daher
+     * strikt begrenzt und nur ins Log; Throttle in der Route.
+     */
+    public function diag(Request $request)
+    {
+        $d = $request->validate([
+            'addin' => 'nullable|string|max:20',
+            'stage' => 'nullable|string|max:40',
+            'code' => 'nullable|string|max:40',
+            'message' => 'nullable|string|max:300',
+            'host' => 'nullable|string|max:40',
+            'platform' => 'nullable|string|max:40',
+            'version' => 'nullable|string|max:40',
+        ]);
+        Log::warning('Add-in-Diagnose: '.json_encode($d, JSON_UNESCAPED_UNICODE).' von '.$request->ip());
+
+        return response()->noContent();
     }
 }

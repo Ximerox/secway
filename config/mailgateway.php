@@ -102,6 +102,17 @@ return [
 
     'classify_token' => env('MGW_CLASSIFY_TOKEN'),
 
+    // Office-SSO der Outlook-Add-ins (Entra-App ohne Secret, eine für beide
+    // Add-ins): docs/ANLEITUNG-ADDIN-SSO.md. Sind diese Werte gesetzt, nimmt die
+    // API Entra-Tokens an; die festen Tokens oben gelten nur noch im Übergang
+    // und werden danach aus der .env entfernt.
+    // Anwendungs-ID-URI leer = api://<APP_URL-Host>/<Client-ID>.
+    'addin_sso' => [
+        'tenant_id' => env('ADDIN_SSO_TENANT_ID', ''),
+        'client_id' => env('ADDIN_SSO_CLIENT_ID', ''),
+        'app_id_uri' => env('ADDIN_SSO_APP_ID_URI', ''),
+    ],
+
     // Bearer-Token für das Compose-Add-in „SecWay Signatur" (/api/signature).
     // Bewusst getrennt vom Classify-Token: eines lässt sich rotieren/sperren,
     // ohne das andere Add-in zu stören.

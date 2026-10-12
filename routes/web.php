@@ -43,6 +43,8 @@ Route::get('/api/subject-tag', [ClassifyController::class, 'subjectTag'])->middl
 
 // Stateless-API fürs Compose-Add-in „SecWay Signatur" (eigenes Token)
 Route::post('/api/signature', [SignatureController::class, 'signature'])->middleware('throttle:240,1');
+// Diagnose der Add-ins (Token-Fehler etc., nur ins Log)
+Route::post('/api/addin/diag', [SignatureController::class, 'diag'])->middleware('throttle:30,1');
 
 Route::prefix('admin')->group(function () {
     Route::get('login', [AdminAuthController::class, 'showLogin'])->name('login');

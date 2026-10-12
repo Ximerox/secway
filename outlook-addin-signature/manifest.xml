@@ -18,7 +18,7 @@
            xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
            xsi:type="MailApp">
   <Id>REPLACE-WITH-YOUR-OWN-GUID-1111-111111111111</Id>
-  <Version>1.0.2.0</Version>
+  <Version>1.1.0.0</Version>
   <ProviderName>Example Org</ProviderName>
   <DefaultLocale>de-DE</DefaultLocale>
   <DisplayName DefaultValue="SecWay Signatur"/>
@@ -87,6 +87,16 @@
           <bt:Url id="JSRuntime.Url" DefaultValue="https://secway.example.org/addin/sig/signature.js"/>
         </bt:Urls>
       </Resources>
+      <!-- Office-SSO: Token des angemeldeten Benutzers fuer die SecWay-API
+           (Rueckfall zu Nested App Authentication), docs/ANLEITUNG-ADDIN-SSO.md -->
+      <WebApplicationInfo>
+        <Id>REPLACE-WITH-ADDIN-CLIENT-ID</Id>
+        <Resource>api://secway.example.org/REPLACE-WITH-ADDIN-CLIENT-ID</Resource>
+        <Scopes>
+          <Scope>openid</Scope>
+          <Scope>profile</Scope>
+        </Scopes>
+      </WebApplicationInfo>
     </VersionOverrides>
   </VersionOverrides>
 </OfficeApp>

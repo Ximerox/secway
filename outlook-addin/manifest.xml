@@ -19,7 +19,7 @@
            xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
            xsi:type="MailApp">
   <Id>REPLACE-WITH-YOUR-OWN-GUID-0000-000000000000</Id>
-  <Version>1.0.6.0</Version>
+  <Version>1.1.0.0</Version>
   <ProviderName>Example Org</ProviderName>
   <DefaultLocale>de-DE</DefaultLocale>
   <DisplayName DefaultValue="SecWay – Sicher versenden"/>
@@ -117,6 +117,16 @@
           <bt:String id="secureSendTip" DefaultValue="Markiert die Nachricht für den gesicherten, verschlüsselten Versand und sendet sie."/>
         </bt:LongStrings>
       </Resources>
+      <!-- Office-SSO: Token des angemeldeten Benutzers fuer die SecWay-API
+           (Rueckfall zu Nested App Authentication), docs/ANLEITUNG-ADDIN-SSO.md -->
+      <WebApplicationInfo>
+        <Id>REPLACE-WITH-ADDIN-CLIENT-ID</Id>
+        <Resource>api://secway.example.org/REPLACE-WITH-ADDIN-CLIENT-ID</Resource>
+        <Scopes>
+          <Scope>openid</Scope>
+          <Scope>profile</Scope>
+        </Scopes>
+      </WebApplicationInfo>
     </VersionOverrides>
   </VersionOverrides>
 </OfficeApp>
