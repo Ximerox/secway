@@ -40,6 +40,7 @@ class AuditEvent extends Model
         'reply_sent' => 'Portal',
         'reply_rejected' => 'Portal',
         'purged' => 'System',
+        'sender_notified_unread' => 'System',
         'ingest_rejected' => 'abgewiesen',
         'ingest_loop_dropped' => 'abgewiesen',
         'ingest_dropped_bounce' => 'abgewiesen',

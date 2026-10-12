@@ -47,9 +47,12 @@ class MailIngest extends Command
         try {
             return $this->process();
         } catch (Throwable $e) {
-            Log::error('mail:ingest fehlgeschlagen: '.$e->getMessage(), ['exception' => $e]);
+            // TEMPFAIL statt endgültigem Fehler: Postfix behält die Mail in der Queue
+            // und versucht es erneut (Health-Check warnt bei wachsender Queue). Ein
+            // Programmfehler oder DB-Aussetzer erzeugt so keinen Bounce/Verlust.
+            Log::error('mail:ingest fehlgeschlagen (TEMPFAIL): '.$e->getMessage(), ['exception' => $e]);
 
-            return self::EX_UNAVAILABLE;
+            return self::EX_TEMPFAIL;
         }
     }
 
@@ -371,14 +374,18 @@ class MailIngest extends Command
         if ($passExternal !== [] && ! $isSmime && Setting::getBool('smime_sign_plain', false)) {
             try {
                 if (app(SmimeMailService::class)->signAndPassThrough($raw, $sender, $passExternal, $parsed)) {
-                    $signedRcpts = $passExternal;
-                    AuditEvent::log('passed_through', details: array_merge([
-                        'queue_id' => $queueId, 'sender' => $sender, 'recipients' => $signedRcpts,
-                        'subject' => mb_substr((string) $parsed->getSubject(), 0, 200), 'signed' => true,
-                    ], $reviewScore !== null ? ['ki_score' => $reviewScore] : []));
+                    $signedRcpts = $passExternal; // sofort setzen: ab hier ist die Mail versendet
                 }
             } catch (Throwable $e) {
                 Log::warning("mail:ingest {$queueId}: Signieren übersprungen, unsigniert versendet: ".$e->getMessage());
+            }
+            if ($signedRcpts !== []) {
+                // Protokoll AUSSERHALB des try: ein Fehler hier darf nie zum
+                // zweiten (unsignierten) Versand führen
+                AuditEvent::log('passed_through', details: array_merge([
+                    'queue_id' => $queueId, 'sender' => $sender, 'recipients' => $signedRcpts,
+                    'subject' => mb_substr((string) $parsed->getSubject(), 0, 200), 'signed' => true,
+                ], $reviewScore !== null ? ['ki_score' => $reviewScore] : []));
             }
         }
         $passRcpts = array_values(array_diff($passRcpts, $signedRcpts));

@@ -77,6 +77,13 @@
                     <p class="muted" style="margin-top:6px;">Zusätzliche letzte Erinnerung, wenn eine noch nicht abgerufene Nachricht in dieser Zeit automatisch gelöscht wird (0 = aus). Wird unabhängig von der Erinnerung oben genau einmal versendet — auch wenn diese schon verschickt wurde.</p>
                 </div>
             </div>
+            <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;cursor:pointer;margin-top:14px;">
+                <input type="checkbox" wire:model="notify_sender_unread" style="margin-top:3px;">
+                <span>
+                    <strong>Absender benachrichtigen, wenn nicht abgerufen</strong><br>
+                    <span class="muted">Läuft eine Nachricht ab, ohne dass alle Empfänger sie abgerufen haben, bekommt der (interne) Absender beim Löschen einen Hinweis mit Betreff und den betroffenen Empfängern — ohne Nachrichteninhalt.</span>
+                </span>
+            </label>
         </div>
 
         <div class="card">

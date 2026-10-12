@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class EntraUser extends Model
@@ -16,7 +17,19 @@ class EntraUser extends Model
         'classify_enabled' => 'boolean',
         'signature_client_enabled' => 'boolean',
         'synced_at' => 'datetime',
+        'missing_since' => 'datetime',
     ];
+
+    /**
+     * Vom Sync nicht mehr gefundene Konten (missing_since gesetzt) sind für die
+     * Anwendung unsichtbar (keine Signatur, nicht in Listen), bleiben aber mit
+     * ihren Schaltern erhalten, bis entra:sync sie nach der Frist löscht.
+     * Der Sync selbst arbeitet mit withoutGlobalScope('present').
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('present', fn (Builder $q) => $q->whereNull('missing_since'));
+    }
 
     /** Findet den Datensatz zu einer Absenderadresse (mail, UPN oder SMTP-Alias). */
     public static function forSender(string $email): ?self

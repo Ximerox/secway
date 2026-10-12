@@ -28,6 +28,8 @@ class Settings extends Component
 
     public int $reminder_before_expiry_hours = 0;
 
+    public bool $notify_sender_unread = true;
+
     public bool $reply_enabled = false;
 
     public int $reply_max_size_mb = 20;
@@ -58,6 +60,7 @@ class Settings extends Component
         $this->password_delay_minutes = (int) Setting::get('password_delay_minutes', config('mailgateway.password_delay_minutes'));
         $this->reminder_after_hours = (int) Setting::get('reminder_after_hours', config('mailgateway.reminder_after_hours'));
         $this->reminder_before_expiry_hours = (int) Setting::get('reminder_before_expiry_hours', config('mailgateway.reminder_before_expiry_hours'));
+        $this->notify_sender_unread = Setting::getBool('notify_sender_unread', (bool) config('mailgateway.notify_sender_unread'));
         $this->reply_enabled = Setting::getBool('reply_enabled', (bool) config('mailgateway.reply_enabled'));
         $this->reply_max_size_mb = (int) Setting::get('reply_max_size_mb', config('mailgateway.reply_max_size_mb'));
         $this->reply_max_per_message = (int) Setting::get('reply_max_per_message', config('mailgateway.reply_max_per_message'));
@@ -103,6 +106,7 @@ class Settings extends Component
         Setting::set('password_delay_minutes', $this->password_delay_minutes);
         Setting::set('reminder_after_hours', $this->reminder_after_hours);
         Setting::set('reminder_before_expiry_hours', $this->reminder_before_expiry_hours);
+        Setting::set('notify_sender_unread', $this->notify_sender_unread);
         Setting::set('reply_enabled', $this->reply_enabled);
         Setting::set('reply_max_size_mb', $this->reply_max_size_mb);
         Setting::set('reply_max_per_message', $this->reply_max_per_message);
@@ -123,6 +127,7 @@ class Settings extends Component
             'password_delay_minutes' => $this->password_delay_minutes,
             'reminder_after_hours' => $this->reminder_after_hours,
             'reminder_before_expiry_hours' => $this->reminder_before_expiry_hours,
+            'notify_sender_unread' => $this->notify_sender_unread,
             'reply_enabled' => $this->reply_enabled,
             'reply_max_size_mb' => $this->reply_max_size_mb,
             'reply_max_per_message' => $this->reply_max_per_message,

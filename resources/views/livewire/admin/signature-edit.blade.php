@@ -316,9 +316,23 @@
             const ed = window.tinymce && tinymce.get('sig-html-editor');
             if (ed) ed.insertContent('<img src="' + url + '" alt="">');
         }
-        document.addEventListener('livewire:navigated', () => {
-            setTimeout(() => sigInitEditor(window.SIG_INITIAL_HTML || ''), 60);
-        });
+        // Bei wire:navigate läuft dieses Skript, bevor tinymce.min.js (oben,
+        // asynchron nachgeladen) fertig ist — deshalb warten statt einmalig
+        // versuchen. Sonst fehlt der Editor beim ersten Öffnen.
+        function sigBoot(tries) {
+            if (window.tinymce && document.getElementById('sig-html-editor')) {
+                sigInitEditor(window.SIG_INITIAL_HTML || '');
+            } else if (tries > 0) {
+                setTimeout(() => sigBoot(tries - 1), 50);
+            }
+        }
+        sigBoot(200);
+        if (!window.__sigNavHooked) {
+            window.__sigNavHooked = true;
+            document.addEventListener('livewire:navigated', () => {
+                if (document.getElementById('sig-html-editor')) { sigBoot(200); }
+            });
+        }
     @endverbatim
     </script>
 

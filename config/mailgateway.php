@@ -23,6 +23,10 @@ return [
     // Zweite Erinnerung X Stunden VOR der automatischen Löschung (0 = aus)
     'reminder_before_expiry_hours' => env('MGW_REMINDER_BEFORE_EXPIRY_HOURS', 0),
 
+    // Absender benachrichtigen, wenn eine Portal-Nachricht abläuft, ohne dass
+    // alle Empfänger sie abgerufen haben (Admin → Einstellungen; Standard an).
+    'notify_sender_unread' => (bool) env('MGW_NOTIFY_SENDER_UNREAD', true),
+
     // Auslöse-Tag im Betreff, wird vor der Ablage entfernt
     'subject_tag' => env('MGW_SUBJECT_TAG', '[sicher]'),
 
@@ -60,6 +64,10 @@ return [
         'client_id' => env('GRAPH_CLIENT_ID'),
         'client_secret' => env('GRAPH_CLIENT_SECRET'),
     ],
+
+    // Vom Entra-Sync nicht mehr gefundene Konten: erst markieren, nach so vielen
+    // Tagen löschen (samt Schaltern Add-in-Prüfung/Signatur im Client).
+    'entra_missing_purge_days' => env('MGW_ENTRA_MISSING_PURGE_DAYS', 30),
 
     // Basis-URL der Verwaltung für Links in Hinweis-Mails (z. B. interner
     // Hostname, wenn /admin nur intern ausgeliefert wird). Leer = APP_URL.

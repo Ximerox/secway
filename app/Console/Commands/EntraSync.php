@@ -102,7 +102,7 @@ class EntraSync extends Command
         $updated = 0;
 
         foreach ($withMail as $u) {
-            $row = EntraUser::updateOrCreate(['entra_id' => $u['id']], [
+            $row = EntraUser::withoutGlobalScope('present')->updateOrCreate(['entra_id' => $u['id']], [
                 'upn' => $u['userPrincipalName'] ?? '',
                 'mail' => $u['mail'],
                 'display_name' => $u['displayName'] ?? null,
@@ -124,23 +124,34 @@ class EntraSync extends Command
                 'account_enabled' => (bool) ($u['accountEnabled'] ?? true),
                 'raw' => $u,
                 'synced_at' => now(),
+                'missing_since' => null,
             ]);
             $row->wasRecentlyCreated ? $created++ : $updated++;
             $seen[] = $u['id'];
         }
 
-        // Nicht mehr im Umfang enthaltene Konten aufräumen — aber nie alles
-        // löschen, wenn Graph nichts liefert (Schutz vor Fehlkonfiguration).
-        $deleted = 0;
+        // Nicht mehr im Umfang enthaltene Konten erst markieren, nach der Frist
+        // löschen. Ein Teilabruf oder eine Filteränderung setzt so nicht sofort
+        // die Schalter pro Benutzer zurück. Liefert Graph gar nichts, passiert
+        // nichts (Schutz vor Fehlkonfiguration).
+        $missing = $deleted = 0;
         if (count($seen) > 0) {
-            $deleted = EntraUser::whereNotIn('entra_id', $seen)->delete();
+            $scope = EntraUser::withoutGlobalScope('present');
+            $missing = (clone $scope)->whereNotIn('entra_id', $seen)->whereNull('missing_since')
+                ->update(['missing_since' => now()]);
+            if ($missing > 0) {
+                Log::warning("entra:sync: {$missing} Konto/Konten nicht mehr im Sync-Umfang — markiert, noch nicht gelöscht.");
+            }
+            $days = max(1, (int) config('mailgateway.entra_missing_purge_days', 30));
+            $deleted = (clone $scope)->whereNotIn('entra_id', $seen)
+                ->where('missing_since', '<', now()->subDays($days))->delete();
         }
 
         Setting::set('entra_last_sync', now()->toDateTimeString());
 
         $this->info(sprintf(
-            'Quelle %s: %d Benutzer synchronisiert (%d neu, %d aktualisiert, %d entfernt; %d per Muster ausgeschlossen, %d ohne Mailadresse übersprungen).',
-            $mode, count($seen), $created, $updated, $deleted, $excluded, count($all) - count($withMail)
+            'Quelle %s: %d Benutzer synchronisiert (%d neu, %d aktualisiert, %d neu als fehlend markiert, %d nach Frist entfernt; %d per Muster ausgeschlossen, %d ohne Mailadresse übersprungen).',
+            $mode, count($seen), $created, $updated, $missing, $deleted, $excluded, count($all) - count($withMail)
         ));
 
         return self::SUCCESS;
