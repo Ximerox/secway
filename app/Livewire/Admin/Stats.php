@@ -118,8 +118,11 @@ class Stats extends Component
             'sigEnabled' => Setting::getBool('signature_enabled', false),
             'sigActiveTemplates' => SignatureTemplate::where('active', true)->count(),
             'clsEnabled' => Setting::getBool('classify_enabled', false),
-            'clsChecks' => SendClassifyLog::where('created_at', '>=', $from)->count(),
-            'clsAsked' => SendClassifyLog::where('created_at', '>=', $from)->where('asked', true)->count(),
+            // Add-in-Abfragen und nachgelagerte KI-Prüfung im Gateway (source=review)
+            // getrennt zählen — beide landen in send_classify_log.
+            'clsChecks' => SendClassifyLog::where('created_at', '>=', $from)->where('source', '!=', 'review')->count(),
+            'clsAsked' => SendClassifyLog::where('created_at', '>=', $from)->where('source', '!=', 'review')->where('asked', true)->count(),
+            'reviewChecks' => SendClassifyLog::where('created_at', '>=', $from)->where('source', 'review')->count(),
             'clsOverrides' => $countEvent(['send_override']),
             'llmMode' => Setting::llmReviewMode(),
             'llmSecured' => $countEvent(['llm_secured']),

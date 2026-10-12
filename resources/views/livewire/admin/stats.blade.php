@@ -123,6 +123,7 @@
                 <tr><td>Add-in-Prüfungen beim Senden</td><td class="mono" style="text-align:right;">{{ number_format($clsChecks, 0, ',', '.') }}</td></tr>
                 <tr><td>davon Rückfrage „Sicher versenden?"</td><td class="mono" style="text-align:right;">{{ number_format($clsAsked, 0, ',', '.') }}</td></tr>
                 <tr><td>trotz Warnung ungesichert gesendet</td><td class="mono" style="text-align:right;">{{ $clsOverrides > 0 ? '⚠ ' : '' }}{{ number_format($clsOverrides, 0, ',', '.') }}</td></tr>
+                <tr><td>KI-Prüfungen im Gateway (unverschlüsselt nach extern)</td><td class="mono" style="text-align:right;">{{ number_format($reviewChecks, 0, ',', '.') }}</td></tr>
                 <tr><td>von KI-Prüfung nachträglich abgesichert</td><td class="mono" style="text-align:right;">{{ number_format($llmSecured, 0, ',', '.') }}</td></tr>
                 <tr><td>KI hätte abgesichert (Nur-Log-Modus)</td><td class="mono" style="text-align:right;">{{ number_format($llmFlagged, 0, ',', '.') }}</td></tr>
                 <tr><td>Regeln &amp; Einstellungen</td><td class="mono" style="text-align:right;"><a href="{{ route('admin.sendrules') }}">öffnen</a></td></tr>
