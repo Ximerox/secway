@@ -190,9 +190,21 @@ Mail the gateway sends itself (notifications, re-injected mail via `sendmail`) e
 
 1. **Outbound connector** (M365 → gateway): smarthost = `secway.example.org`, used only via
    transport rule, TLS required.
-2. **Inbound connector** (gateway → M365): type *OnPremises*, identified by the TLS certificate
-   name `secway.example.org` (this is why Postfix presents the Let's Encrypt certificate as
-   client certificate).
+2. **Inbound connector** (gateway → M365): type *OnPremises* ("Your organization's email
+   server" — **not** *Partner*; the type cannot be changed later), identified by the TLS
+   certificate name `secway.example.org` (this is why Postfix presents the Let's Encrypt
+   certificate as client certificate). Then, in Exchange Online PowerShell:
+
+   ```powershell
+   Set-InboundConnector -Identity "<name>" -CloudServicesMailEnabled $false -TreatMessagesAsInternal $true
+   ```
+
+   Without `TreatMessagesAsInternal`, mail returning from the gateway is stamped
+   `X-MS-Exchange-Organization-AuthAs: Anonymous` — internal mail then no longer counts as
+   internal and e.g. **message recall** fails ("only for recipients inside the organization").
+   The admin-center wizard enables `CloudServicesMailEnabled` (hybrid Exchange only), which
+   blocks `TreatMessagesAsInternal`. The outbound connector stays type *Partner* (an
+   *OnPremises* outbound connector risks TNEF/`winmail.dat`).
 3. **Transport rule** "route through SecWay":
    - **Condition:** sender is internal. Optionally restrict to a pilot group first.
      **No subject condition** — the tag logic lives in the gateway!
