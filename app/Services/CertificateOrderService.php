@@ -77,12 +77,24 @@ class CertificateOrderService
         $pkey = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => max(3072, $bits)])
             ?: throw new RuntimeException('Schlüsselerzeugung fehlgeschlagen: '.openssl_error_string());
 
-        $csr = openssl_csr_new([
+        // Eigene Minimal-Konfiguration: sonst ergänzt OpenSSL die *_default-Werte
+        // aus /etc/ssl/openssl.cnf ("Some-State", "Internet Widgits Pty Ltd").
+        $cnf = tempnam(sys_get_temp_dir(), 'mgwcsr');
+        file_put_contents($cnf, "[req]\ndistinguished_name = dn\nprompt = no\n[dn]\n");
+        $dn = array_filter([
             'countryName' => (string) config('mailgateway.psw.country', 'DE'),
+            'stateOrProvinceName' => (string) config('mailgateway.psw.csr.state'),
+            'localityName' => (string) config('mailgateway.psw.csr.locality'),
+            'organizationName' => (string) config('mailgateway.psw.contact.organisation'),
             'commonName' => $email,
             'emailAddress' => $email,
-        ], $pkey, ['digest_alg' => 'sha256'])
-            ?: throw new RuntimeException('CSR-Erzeugung fehlgeschlagen: '.openssl_error_string());
+        ], fn ($v) => $v !== '');
+        try {
+            $csr = openssl_csr_new($dn, $pkey, ['digest_alg' => 'sha256', 'config' => $cnf])
+                ?: throw new RuntimeException('CSR-Erzeugung fehlgeschlagen: '.openssl_error_string());
+        } finally {
+            @unlink($cnf);
+        }
 
         openssl_pkey_export($pkey, $keyPem);
         openssl_csr_export($csr, $csrPem);

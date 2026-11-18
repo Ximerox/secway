@@ -146,6 +146,12 @@ return [
         ],
         'key_bits' => (int) env('PSW_KEY_BITS', 3072), // Certum: RSA 3072 oder 4096
         'country' => env('PSW_COUNTRY', 'DE'),
+        // Weitere CSR-Felder (Organisation = PSW_CONTACT_ORG). Bei Certum
+        // „Mailbox" steht im Zertifikat trotzdem nur die E-Mail-Adresse.
+        'csr' => [
+            'state' => env('PSW_CSR_STATE', ''),       // Bundesland, z. B. Baden-Württemberg
+            'locality' => env('PSW_CSR_LOCALITY', ''),
+        ],
         // Besteller/Freigeber (approverContact ist bei Certum Pflicht)
         'contact' => [
             'organisation' => env('PSW_CONTACT_ORG', ''),
