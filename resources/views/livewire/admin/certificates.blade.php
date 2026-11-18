@@ -16,7 +16,8 @@
             @if ($pswMissing)
                 <div class="alert err">Konfiguration unvollständig, in der .env fehlt: {{ implode(', ', $pswMissing) }}</div>
             @endif
-            <form wire:submit="placeOrder">
+            <form wire:submit="placeOrder"
+                  wire:confirm="{{ $pswTest ? 'Testbestellung übermitteln?' : 'Kostenpflichtige Bestellung bei der PSW Group auslösen?' }}">
                 <div class="grid2">
                     <div>
                         <label>E-Mail-Adresse</label>
@@ -32,8 +33,7 @@
                         </select>
                     </div>
                 </div>
-                <button type="submit" class="btn" wire:loading.attr="disabled" @disabled($pswMissing)
-                        wire:confirm="{{ $pswTest ? 'Testbestellung übermitteln?' : 'Kostenpflichtige Bestellung bei der PSW Group auslösen?' }}">Bestellen</button>
+                <button type="submit" class="btn" wire:loading.attr="disabled" @disabled($pswMissing)>Bestellen</button>
                 <span class="muted" wire:loading wire:target="placeOrder">Schlüssel wird erzeugt und Bestellung übermittelt …</span>
             </form>
             <p class="muted" style="margin-bottom:0;">
