@@ -131,4 +131,29 @@ return [
     'llm_review_endpoint' => env('MGW_LLM_REVIEW_ENDPOINT', 'http://127.0.0.1:8082/v1/chat/completions'),
     'llm_review_timeout' => env('MGW_LLM_REVIEW_TIMEOUT', 9),
 
+    // Bestellung eigener S/MIME-Zertifikate bei der PSW Group (REST-API,
+    // OAuth2 Client Credentials). Ohne Client-ID/Secret ist die Funktion aus.
+    // Testsystem: https://test-api.psw-group.de/v1 (Bestellungen kostenlos).
+    // Der API-Client ist bei PSW auf die Gateway-IP beschränkt.
+    'psw' => [
+        'api_url' => env('PSW_API_URL', 'https://api.psw-group.de/v1'),
+        'client_id' => env('PSW_CLIENT_ID', ''),
+        'client_secret' => env('PSW_CLIENT_SECRET', ''),
+        // Bestellbare Produkte (PSW-Artikelnummer => Anzeigename)
+        'products' => [
+            env('PSW_PRODUCT_1Y', 'A001771') => 'Certum S/MIME Mailbox, 1 Jahr',
+            env('PSW_PRODUCT_2Y', 'A001772') => 'Certum S/MIME Mailbox, 2 Jahre',
+        ],
+        'key_bits' => (int) env('PSW_KEY_BITS', 3072), // Certum: RSA 3072 oder 4096
+        'country' => env('PSW_COUNTRY', 'DE'),
+        // Besteller/Freigeber (approverContact ist bei Certum Pflicht)
+        'contact' => [
+            'organisation' => env('PSW_CONTACT_ORG', ''),
+            'firstname' => env('PSW_CONTACT_FIRSTNAME', ''),
+            'lastname' => env('PSW_CONTACT_LASTNAME', ''),
+            'email' => env('PSW_CONTACT_EMAIL', ''),
+            'telephone' => env('PSW_CONTACT_PHONE', ''),
+        ],
+    ],
+
 ];

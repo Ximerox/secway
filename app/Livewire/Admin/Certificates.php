@@ -3,8 +3,12 @@
 namespace App\Livewire\Admin;
 
 use App\Models\AuditEvent;
+use App\Models\CertificateOrder;
 use App\Models\SmimeCertificate;
+use App\Services\CertificateOrderService;
+use App\Services\PswApi;
 use App\Services\SmimeCertificateService;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -30,6 +34,12 @@ class Certificates extends Component
     public string $exportPassword = '';
 
     public string $tab = 'own';
+
+    public string $orderEmail = '';
+
+    public string $orderProduct = '';
+
+    public string $backupPassword = '';
 
     public string $ownSort = 'target';
 
@@ -127,6 +137,7 @@ class Certificates extends Component
         AuditEvent::log('cert_exported', ip: request()->ip(), details: [
             'id' => $cert->id, 'target' => $cert->target, 'mode' => 'with_key',
         ]);
+        $cert->forceFill(['exported_at' => now()])->save();
         $this->exportPassword = '';
 
         $name = 'zertifikat-mit-schluessel-'.preg_replace('/[^a-z0-9.@-]+/i', '_', $cert->target).'.p12';
@@ -134,6 +145,117 @@ class Certificates extends Component
         return response()->streamDownload(function () use ($p12) {
             echo $p12;
         }, $name, ['Content-Type' => 'application/x-pkcs12']);
+    }
+
+    /**
+     * Sicherung: alle eigenen Zertifikate mit Schlüssel als ZIP aus einzelnen,
+     * mit demselben Passwort geschützten .p12-Dateien.
+     */
+    public function exportAll()
+    {
+        $this->validate(
+            ['backupPassword' => 'required|string|min:12'],
+            ['backupPassword.required' => 'Bitte ein Passwort für die Sicherung vergeben.',
+             'backupPassword.min' => 'Für die Gesamtsicherung mindestens 12 Zeichen.'],
+        );
+
+        $certs = SmimeCertificate::where('type', 'own')->whereNotNull('key_pem')->orderBy('target')->get();
+        if ($certs->isEmpty()) {
+            $this->addError('backupPassword', 'Keine eigenen Zertifikate mit Schlüssel vorhanden.');
+
+            return null;
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'mgwbak');
+        $zip = new \ZipArchive;
+        if ($zip->open($tmp, \ZipArchive::OVERWRITE) !== true) {
+            $this->addError('backupPassword', 'ZIP konnte nicht angelegt werden.');
+
+            return null;
+        }
+        $list = [];
+        $done = [];
+        foreach ($certs as $cert) {
+            $blocks = $cert->pemBlocks();
+            $p12 = '';
+            if (! openssl_pkcs12_export($blocks[0] ?? $cert->cert_pem, $p12, $cert->privateKey(), $this->backupPassword,
+                count($blocks) > 1 ? ['extracerts' => array_slice($blocks, 1)] : [])) {
+                $list[] = 'FEHLER beim Export: '.$cert->target.' (#'.$cert->id.')';
+
+                continue;
+            }
+            $name = preg_replace('/[^a-z0-9.@-]+/i', '_', $cert->target).'_'.($cert->valid_until?->format('Y-m-d') ?? 'x').'_'.$cert->id.'.p12';
+            $zip->addFromString($name, $p12);
+            $done[] = $cert->id;
+            $list[] = $name.'  '.$cert->subject.'  gültig bis '.$cert->valid_until?->format('d.m.Y')
+                .($cert->active ? '' : '  (deaktiviert)');
+        }
+        $zip->addFromString('LIESMICH.txt', 'SecWay-Sicherung eigener S/MIME-Zertifikate vom '.now()->format('d.m.Y H:i')."\r\n"
+            ."Jede .p12-Datei enthält Zertifikat, CA-Kette und PRIVATEN SCHLÜSSEL und ist mit dem\r\n"
+            ."beim Export vergebenen Passwort geschützt. Sicher aufbewahren, nicht weitergeben.\r\n\r\n"
+            .implode("\r\n", $list)."\r\n");
+        $zip->close();
+        $data = file_get_contents($tmp);
+        @unlink($tmp);
+
+        SmimeCertificate::whereIn('id', $done)->update(['exported_at' => now()]);
+        AuditEvent::log('cert_exported', ip: request()->ip(), details: ['mode' => 'backup_all', 'count' => count($done)]);
+        $this->backupPassword = '';
+
+        return response()->streamDownload(function () use ($data) {
+            echo $data;
+        }, 'secway-zertifikate-'.now()->format('Y-m-d').'.zip', ['Content-Type' => 'application/zip']);
+    }
+
+    /** Neues Zertifikat bei der PSW Group bestellen. */
+    public function placeOrder(CertificateOrderService $service): void
+    {
+        $this->validate(
+            ['orderEmail' => 'required|email', 'orderProduct' => 'required|string'],
+            ['orderEmail.required' => 'Bitte die E-Mail-Adresse angeben.', 'orderEmail.email' => 'Ungültige E-Mail-Adresse.'],
+        );
+        $by = Auth::user()?->username ?: Auth::user()?->name;
+        try {
+            $order = $service->place($this->orderEmail, $this->orderProduct, $by);
+        } catch (Throwable $e) {
+            $this->addError('orderEmail', $e->getMessage());
+
+            return;
+        }
+        $this->reset('orderEmail');
+        session()->flash('ok', "Bestellung für „{$order->email}“ übermittelt (PSW-Bestellnr. {$order->psw_order_number}). Der Status wird alle 15 Minuten abgefragt.");
+    }
+
+    /** Bestellformular mit der Adresse eines bestehenden Zertifikats vorbelegen (Verlängerung). */
+    public function prefillOrder(int $id): void
+    {
+        $this->orderEmail = SmimeCertificate::where('type', 'own')->findOrFail($id)->target;
+    }
+
+    public function refreshOrder(int $id, CertificateOrderService $service): void
+    {
+        $service->poll(CertificateOrder::findOrFail($id));
+    }
+
+    public function resendOrderMail(int $id, CertificateOrderService $service): void
+    {
+        try {
+            $service->resendValidationEmail(CertificateOrder::findOrFail($id));
+            session()->flash('ok', 'Validierungsmail wird erneut versendet.');
+        } catch (Throwable $e) {
+            session()->flash('err', $e->getMessage());
+        }
+    }
+
+    public function cancelOrder(int $id, CertificateOrderService $service): void
+    {
+        $order = CertificateOrder::findOrFail($id);
+        try {
+            $service->cancel($order);
+            session()->flash('ok', "Bestellung für {$order->email} storniert.");
+        } catch (Throwable $e) {
+            session()->flash('err', 'Stornierung fehlgeschlagen: '.$e->getMessage());
+        }
     }
 
     public function save(SmimeCertificateService $service): void
@@ -198,9 +320,20 @@ class Certificates extends Component
             $partnerQuery->orderByDesc('valid_until');
         }
 
+        $products = config('mailgateway.psw.products', []);
+        if ($this->orderProduct === '' || ! isset($products[$this->orderProduct])) {
+            $this->orderProduct = (string) array_key_last($products);
+        }
+
         return view('livewire.admin.certificates', [
             'own' => $ownQuery->get(),
             'partners' => $partnerQuery->get(),
+            'psw' => PswApi::configured(),
+            'pswTest' => PswApi::isTestSystem(),
+            'pswMissing' => CertificateOrderService::missingConfig(),
+            'pswProducts' => $products,
+            'orders' => CertificateOrder::orderByDesc('id')->limit(30)->get(),
+            'unsaved' => SmimeCertificate::where('type', 'own')->whereNotNull('key_pem')->whereNull('exported_at')->count(),
         ]);
     }
 }
