@@ -223,7 +223,7 @@ class CertificateOrderService
         } catch (Throwable) {
             return null;
         }
-        $rows = PswApi::items($d) ?: [$d];
+        $rows = PswApi::items($d) ?: (isset($d['totalItems']) ? [] : [$d]);
         $out = [];
         foreach ($rows as $r) {
             unset($r['_links']);
