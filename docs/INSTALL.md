@@ -188,31 +188,34 @@ Mail the gateway sends itself (notifications, re-injected mail via `sendmail`) e
 
 ## 6. Exchange Online
 
-1. **Outbound connector** (M365 → gateway): smarthost = `secway.example.org`, used only via
-   transport rule, TLS required.
-2. **Inbound connector** (gateway → M365): type *OnPremises* ("Your organization's email
-   server" — **not** *Partner*; the type cannot be changed later), identified by the TLS
-   certificate name `secway.example.org` (this is why Postfix presents the Let's Encrypt
-   certificate as client certificate). Then, in Exchange Online PowerShell:
+1. **Outbound connector** (M365 → gateway): type *OnPremises* ("Your organization's email
+   server"), smarthost = `secway.example.org`, used only via transport rule, TLS required.
+2. **Inbound connector** (gateway → M365): type *OnPremises* as well (**not** *Partner*; the
+   type cannot be changed later), identified by the TLS certificate name `secway.example.org`
+   (this is why Postfix presents the Let's Encrypt certificate as client certificate).
+3. **Both** connectors need `CloudServicesMailEnabled` (Exchange Online PowerShell; the admin
+   center does not offer it):
 
    ```powershell
-   Set-InboundConnector -Identity "<name>" -CloudServicesMailEnabled $false -TreatMessagesAsInternal $true
+   Set-OutboundConnector -Identity "<outbound>" -CloudServicesMailEnabled $true
+   Set-InboundConnector  -Identity "<inbound>"  -TreatMessagesAsInternal $false -CloudServicesMailEnabled $true
    ```
 
-   Without `TreatMessagesAsInternal`, mail returning from the gateway is stamped
-   `X-MS-Exchange-Organization-AuthAs: Anonymous` — internal mail then no longer counts as
-   internal and e.g. **message recall** fails ("only for recipients inside the organization").
-   The admin-center wizard enables `CloudServicesMailEnabled` (hybrid Exchange only), which
-   blocks `TreatMessagesAsInternal`. The outbound connector stays type *Partner* (an
-   *OnPremises* outbound connector risks TNEF/`winmail.dat`).
-3. **Transport rule** "route through SecWay":
+   With it, Exchange keeps its organization headers across the hop through the gateway: mail
+   returning from the gateway stays internal (`AuthAs: Internal`) and **message recall** works.
+   Without it (or with only `TreatMessagesAsInternal`), the returning mail is a new message for
+   Exchange and recall fails with "recipients outside your organization". The gateway passes
+   recall messages through untouched (detected via the `X-MS-Exchange-*TransportRecall*`
+   headers). TNEF must be off (`Set-RemoteDomain Default -TNEFEnabled $false`, see section 7),
+   otherwise an *OnPremises* outbound connector can deliver `winmail.dat`.
+4. **Transport rule** "route through SecWay":
    - **Condition:** sender is internal. Optionally restrict to a pilot group first.
      **No subject condition** — the tag logic lives in the gateway!
    - **Actions:** set header `X-MGW-Auth` = value of `MGW_INGEST_SECRET`, route via the
      outbound connector.
    - **Exception:** header `X-MGW-Notification` contains `yes` (loop protection — the gateway
      marks everything it sends with this header).
-4. For **inbound decryption/harvesting**, add a rule for external S/MIME mail routing through
+5. For **inbound decryption/harvesting**, add a rule for external S/MIME mail routing through
    the same connector with the same header. Match S/MIME reliably via the Content-Type header
    (the built-in "message type" condition only accepts one type per condition):
    - **Conditions:** sender is outside the organization, **and** header `Content-Type` contains

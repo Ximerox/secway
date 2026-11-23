@@ -140,14 +140,11 @@ class MailIngest extends Command
             return self::EX_TEMPFAIL;
         }
 
-        // Outlook-Rückrufnachricht: völlig unverändert durchreichen (keine Signatur,
+        // Exchange-Rückrufnachricht: völlig unverändert durchreichen (keine Signatur,
         // kein S/MIME, kein Portal) — jede Änderung macht aus dem Rückruf eine
-        // normale Mail „Recall: …“. Erkennung vorerst über den Betreff; die Header
-        // werden protokolliert, um ein sichereres Merkmal zu finden.
+        // normale Mail „Recall: …“. Funktioniert nur, wenn Aus- und Eingangs-
+        // Connector CloudServicesMailEnabled haben (docs/INSTALL.md, Abschnitt 6).
         if (self::isRecallMessage($parsed)) {
-            $hb = RawMail::split($raw)[0];
-            @file_put_contents(storage_path('logs/recall-headers.log'),
-                '=== '.now()->toDateTimeString()." {$queueId}\n".$hb."\n\n", FILE_APPEND);
             app(SmimeMailService::class)->passThrough($raw, $sender, $recipients);
             AuditEvent::log('passed_through', details: [
                 'queue_id' => $queueId,
@@ -629,9 +626,19 @@ class MailIngest extends Command
         return SubjectTag::strip($subject);
     }
 
-    /** Outlook-Rückrufnachricht (Betreff „Recall:“ bzw. „Rückruf:“ o. ä.). */
+    /**
+     * Exchange-Rückrufnachricht: zuverlässig über die Exchange-Header, die mit
+     * CloudServicesMailEnabled mitreisen; der Betreff „Recall:“/„Rückruf:“ ist
+     * nur Rückfall.
+     */
     public static function isRecallMessage(Message $m): bool
     {
+        if (strtolower(trim((string) $m->getHeaderValue('X-MS-Exchange-CrossPremises-TransportRecallMessage', ''))) === 'true'
+            || trim((string) $m->getHeaderValue('X-MS-Exchange-CrossPremises-TrustedPartner-TransportRecall-OriginalMessageId', '')) !== ''
+            || trim((string) $m->getHeaderValue('X-MS-Exchange-CrossTenant-TrustedPartner-TransportRecall-OriginalMessageId', '')) !== '') {
+            return true;
+        }
+
         return (bool) preg_match('/^\s*(recall|r(ü|ue)ckruf|zur(ü|ue)ckrufen)\s*:/iu', (string) $m->getSubject());
     }
 
