@@ -204,7 +204,8 @@ Mail the gateway sends itself (notifications, re-injected mail via `sendmail`) e
    With it, Exchange keeps its organization headers across the hop through the gateway: mail
    returning from the gateway stays internal (`AuthAs: Internal`) and **message recall** works.
    Without it (or with only `TreatMessagesAsInternal`), the returning mail is a new message for
-   Exchange and recall fails with "recipients outside your organization". The gateway passes
+   Exchange and recall fails with "recipients outside your organization" — also for plain
+   mailbox recipients, not only distribution groups. The gateway passes
    recall messages through untouched (detected via the `X-MS-Exchange-*TransportRecall*`
    headers). TNEF must be off (`Set-RemoteDomain Default -TNEFEnabled $false`, see section 7),
    otherwise an *OnPremises* outbound connector can deliver `winmail.dat`.
@@ -318,10 +319,10 @@ crowdsec.net), run `cscli setup` (detects nginx, Postfix, sshd), then add the Se
 from `deploy/crowdsec/`:
 
 ```bash
-cp deploy/crowdsec/secway.yaml                  /etc/crowdsec/acquis.d/
-cp deploy/crowdsec/straphael-secway-logs.yaml   /etc/crowdsec/parsers/s01-parse/
-cp deploy/crowdsec/straphael-secway-bf.yaml     /etc/crowdsec/scenarios/
-cp deploy/crowdsec/straphael-exo-whitelist.yaml /etc/crowdsec/parsers/s02-enrich/
+cp deploy/crowdsec/secway.yaml               /etc/crowdsec/acquis.d/
+cp deploy/crowdsec/secway-logs.yaml          /etc/crowdsec/parsers/s01-parse/
+cp deploy/crowdsec/secway-bf.yaml            /etc/crowdsec/scenarios/
+cp deploy/crowdsec/secway-exo-whitelist.yaml /etc/crowdsec/parsers/s02-enrich/
 systemctl reload crowdsec
 ```
 
@@ -337,6 +338,43 @@ monitors the `crowdsec` service when it is installed.
 - **Partner certificates** (recipients, public key only): upload manually — or simply let the
   gateway **harvest** them from signed inbound mail.
 - Bulk import: `php artisan smime:import <dir>`.
+- **Backup:** Admin → Zertifikate → *Sicherung* exports all own certificates as one ZIP with a
+  password-protected `.p12` (certificate, chain, private key) per certificate. Certificates
+  never exported are flagged *nicht gesichert*. Keep the ZIP off the server.
+
+### Ordering own certificates via the PSW Group API (optional)
+
+SecWay can order S/MIME certificates for your own addresses from the PSW Group reseller API
+(default products: Certum S/MIME Mailbox, 1 or 2 years). The gateway generates the RSA key and
+CSR itself — only the CSR is sent, the private key never leaves the server. The order status is
+polled every 15 minutes (`psw:poll`); once issued, certificate + chain are fetched and stored
+as an own certificate together with the local key.
+
+1. In the PSW console create an API client (REST). Restrict it to the gateway's **outbound**
+   IP. Permissions: *Einkauf/Bestellung: Schreiben*, *Verwaltung/Zertifikat: Schreiben*,
+   *Job: Lesen* — without *Zertifikat: Schreiben*, "resend validation mail" and "cancel" fail
+   with HTTP 403.
+2. `.env` (start with the free test system `https://test-api.psw-group.de/v1`, which has its
+   own console and client; the admin page shows a *Testsystem* badge):
+
+   ```
+   PSW_API_URL=https://api.psw-group.de/v1
+   PSW_CLIENT_ID=...
+   PSW_CLIENT_SECRET=...
+   PSW_CONTACT_ORG=...
+   PSW_CONTACT_FIRSTNAME=...
+   PSW_CONTACT_LASTNAME=...
+   PSW_CONTACT_EMAIL=...
+   PSW_CONTACT_PHONE=...        # approver contact, mandatory for Certum
+   PSW_CSR_STATE=...            # optional CSR fields
+   PSW_CSR_LOCALITY=...
+   ```
+
+   then `php artisan config:cache`. Without client ID/secret the feature is hidden.
+3. Admin → Zertifikate → *Zertifikat bestellen*. Validation: the CA sends a confirmation mail
+   **to the ordered address**; someone has to click the link (route it to an admin with a
+   transport rule if needed — note that mail returning through the gateway counts as internal,
+   so match on the sender domain, not on "sender outside the organization").
 
 ## 11. Smoke test
 

@@ -13,7 +13,7 @@ abrufbar. Mit den Tokens kann jeder
 Benutzers. Der Server prüft das Token. Im JavaScript steht kein Geheimnis mehr.
 
 Eine App-Registrierung reicht für beide Add-ins, weil beide unter
-`mailgateway.straphael.de` ausgeliefert werden.
+`secway.example.org` ausgeliefert werden.
 
 ---
 
@@ -33,14 +33,14 @@ wiederverwenden. Die Add-in-App ist ein öffentlicher Client und braucht **kein 
 ## 2. Authentifizierung
 
 Authentifizierung → Plattform hinzufügen → **Single-Page-Anwendung**
-- Umleitungs-URI: `brk-multihub://mailgateway.straphael.de`
+- Umleitungs-URI: `brk-multihub://secway.example.org`
   (exakt so: ohne Pfad, ohne Schrägstrich am Ende)
 - Implizite Gewährung: nichts anhaken
 - Öffentliche Clientflows zulassen: **Nein**
 
 ## 3. Eine API verfügbar machen
 
-1. Anwendungs-ID-URI: `api://mailgateway.straphael.de/<Client-ID>` (genau dieses Format)
+1. Anwendungs-ID-URI: `api://secway.example.org/<Client-ID>` (genau dieses Format)
 2. Bereich hinzufügen:
    - Name `access_as_user`
    - Zustimmung: Administratoren und Benutzer
@@ -74,7 +74,7 @@ Unternehmensanwendungen → SecWay Outlook-Add-ins → Eigenschaften →
 
 ## 7. Diese Werte brauche ich
 
-- Tenant-ID (bekannt: `54b7963a-…`)
+- Tenant-ID
 - Client-ID der neuen App
 
 ---

@@ -1,6 +1,6 @@
 # Brute-Force gegen Portal-Kennwoerter oder Admin-Login von SecWay.
 type: leaky
-name: straphael/secway-bf
+name: secway/bf
 description: "Brute-Force gegen SecWay-Portal/Admin"
 filter: "evt.Meta.log_type == 'secway_auth_failed'"
 groupby: evt.Meta.source_ip

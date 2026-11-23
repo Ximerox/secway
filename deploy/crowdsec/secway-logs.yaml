@@ -2,7 +2,7 @@
 # Beispiel (journald, Ident secway): auth_failed event=unlock_failed ip=203.0.113.10
 onsuccess: next_stage
 filter: "evt.Parsed.program == 'secway'"
-name: straphael/secway-logs
+name: secway/logs
 description: "SecWay auth_failed"
 grok:
   pattern: '^auth_failed event=%{WORD:event} ip=%{IP:source_ip}'

@@ -1,6 +1,6 @@
 # Exchange Online / EOP SMTP-Netze laut Microsoft-Endpunktliste (ID 10, TCP 25), Stand 2026-10-01.
 # Quelle: https://endpoints.office.com/endpoints/worldwide - bei Aenderungen nachziehen.
-name: straphael/exo-whitelist
+name: secway/exo-whitelist
 description: "Exchange Online darf das Mailgateway nie verlieren"
 whitelist:
   reason: "Exchange Online / EOP"

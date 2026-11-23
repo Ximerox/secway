@@ -72,7 +72,12 @@ S/MIME **signing** above.
 - **Recipient portal** — token link + password (delivered time-shifted), brute-force lockout,
   download tracking, automatic reminders, automatic expiry and irreversible deletion
 - **Certificate management** — upload (PFX/PEM) for addresses or whole domains, automatic
-  harvesting from verified inbound signatures, expiry overview
+  harvesting from verified inbound signatures, expiry overview, one-click backup of all own
+  certificates (password-protected .p12 per certificate)
+- **Certificate ordering** (optional) — order own S/MIME certificates via the PSW Group API;
+  key and CSR are generated on the gateway, issued certificates are picked up automatically
+- **Message recall keeps working** — Exchange recall messages pass the gateway untouched
+  (requires `CloudServicesMailEnabled` on both connectors, see INSTALL section 6)
 - **Admin UI** (German) — statistics dashboard, message list with remind/delete, live Postfix
   queue view with re-deliver/delete, structured audit log grouped per mail, all settings editable
 - **Operations built in** — health monitoring with alerting and mail-loop emergency brake,

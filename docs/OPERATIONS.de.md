@@ -137,6 +137,23 @@ Betriebssystem-Sicherheitsupdates installiert `unattended-upgrades` automatisch;
   beim Versand im Gateway (*Gateway*) angefügt wird. Beide Flags überleben den Entra-Sync.
 - **Portal-Kennwort neu senden:** Admin → Nachrichten — der 🔑-Knopf hinter dem einzelnen
   Empfänger erzeugt ein neues Kennwort **nur für diesen Empfänger** (die übrigen behalten ihres).
+- **Eigenes Zertifikat bestellen (PSW Group, optional):** Admin → Zertifikate → *Zertifikat
+  bestellen*. Adresse und Laufzeit wählen, bestätigen (kostenpflichtig, außer im Testsystem).
+  Die Zertifizierungsstelle schickt eine Bestätigungsmail an die Adresse, der Link muss
+  angeklickt werden. Danach übernimmt das Gateway das Zertifikat automatisch (Abfrage alle
+  15 Minuten, sofort: *Status abrufen*). HTTP 403 bei „Validierungsmail erneut“/„Stornieren“:
+  API-Client bei PSW braucht *Verwaltung/Zertifikat: Schreiben*. Umstellen Test → Produktiv:
+  `PSW_API_URL`, `PSW_CLIENT_ID`, `PSW_CLIENT_SECRET` in der `.env`, dann `config:cache`.
+- **Eigene Zertifikate sichern:** Admin → Zertifikate → *Sicherung* — ZIP mit je einer
+  passwortgeschützten .p12 pro eigenem Zertifikat. Nach jeder neuen Ausstellung wiederholen
+  (Hinweis „nicht gesichert“). Das ZIP gehört nicht auf den Server.
+- **Nachrichtenrückruf schlägt fehl („Empfänger außerhalb des Unternehmens“):** Beide
+  Exchange-Connectors (Ausgang zum Gateway und Eingang vom Gateway) müssen Typ *OnPremises*
+  mit `CloudServicesMailEnabled $true` sein (nur per PowerShell setzbar); der Eingang **ohne**
+  `TreatMessagesAsInternal`. Alle Transportregeln, die zum Gateway routen, müssen den neuen
+  Connector verwenden. Das Gateway reicht Rückrufnachrichten unverändert durch (Protokoll:
+  „Rückrufnachricht — unverändert durchgereicht“). Kommt beim Empfänger eine Mail
+  „Recall: …“ an, hat Exchange den Rückruf nicht zugeordnet → Connector-Einstellungen prüfen.
 - **Impressum/Datenschutz ändern:** Admin → Einstellungen → HTML-Felder unten.
 - **Eigenes Kennwort / Benutzername ändern:** Admin → Konto.
 - **Weiteren Admin-Benutzer anlegen:** per Tinker (siehe INSTALL.md, „First admin user").

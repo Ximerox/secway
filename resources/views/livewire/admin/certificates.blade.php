@@ -21,7 +21,7 @@
                 <div class="grid2">
                     <div>
                         <label>E-Mail-Adresse</label>
-                        <input type="email" wire:model="orderEmail" placeholder="person@straphael.de">
+                        <input type="email" wire:model="orderEmail" placeholder="person@example.org">
                         @error('orderEmail')<div class="error">{{ $message }}</div>@enderror
                     </div>
                     <div>
