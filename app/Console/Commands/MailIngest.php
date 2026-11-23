@@ -140,6 +140,26 @@ class MailIngest extends Command
             return self::EX_TEMPFAIL;
         }
 
+        // Outlook-Rückrufnachricht: völlig unverändert durchreichen (keine Signatur,
+        // kein S/MIME, kein Portal) — jede Änderung macht aus dem Rückruf eine
+        // normale Mail „Recall: …“. Erkennung vorerst über den Betreff; die Header
+        // werden protokolliert, um ein sichereres Merkmal zu finden.
+        if (self::isRecallMessage($parsed)) {
+            $hb = RawMail::split($raw)[0];
+            @file_put_contents(storage_path('logs/recall-headers.log'),
+                '=== '.now()->toDateTimeString()." {$queueId}\n".$hb."\n\n", FILE_APPEND);
+            app(SmimeMailService::class)->passThrough($raw, $sender, $recipients);
+            AuditEvent::log('passed_through', details: [
+                'queue_id' => $queueId,
+                'sender' => $sender,
+                'recipients' => $recipients,
+                'subject' => mb_substr((string) $parsed->getSubject(), 0, 200),
+                'note' => 'Rückrufnachricht — unverändert durchgereicht',
+            ]);
+
+            return self::EX_OK;
+        }
+
         // Signatur-Modul: Signaturen VOR dem Routing anhängen, damit alle Wege
         // (S/MIME, Portal, PassThrough) die signierte Fassung verwenden.
         // Nur für interne Absender, komplett hinter dem Setting signature_enabled.
@@ -607,6 +627,12 @@ class MailIngest extends Command
     private function cleanSubject(string $subject): string
     {
         return SubjectTag::strip($subject);
+    }
+
+    /** Outlook-Rückrufnachricht (Betreff „Recall:“ bzw. „Rückruf:“ o. ä.). */
+    public static function isRecallMessage(Message $m): bool
+    {
+        return (bool) preg_match('/^\s*(recall|r(ü|ue)ckruf|zur(ü|ue)ckrufen)\s*:/iu', (string) $m->getSubject());
     }
 
     /** Erkennt S/MIME-Nachrichten — direkt oder in einer multipart/mixed-Hülle verpackt. */
